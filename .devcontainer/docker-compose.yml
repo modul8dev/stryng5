@@ -9,7 +9,7 @@ services:
       - ..:/workspace:delegated
     command: sleep infinity
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/daisyseed
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/webapp
     depends_on:
       - db
 
@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: daisyseed
+      POSTGRES_DB: webapp
     ports:
       - "5432:5432"
 

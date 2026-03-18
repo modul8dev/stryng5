@@ -58,7 +58,7 @@ Watch the step-by-step tutorial video/project demo:
 4. **Apply Migrations & Create Superuser**
 
    ```bash
-   cd daisyseed
+   cd webapp
    python manage.py migrate
    ```
 
@@ -104,7 +104,7 @@ Watch the full walkthrough here: [YouTube - Installation & Setup](https://m.yout
 5. The toggle input updates the attribute and saves the new theme back to `localStorage`.
 
 ## ⁉️ How to Change Project Name
-The project name will be daisyseed. However, changing it to any name you want is a quick and easy process; as shown in the following tutorial:
+The project name will be webapp. However, changing it to any name you want is a quick and easy process; as shown in the following tutorial:
 
 
 [![Watch the video](https://img.youtube.com/vi/Ak4XA5QK3_w/hqdefault.jpg)](https://youtu.be/Ak4XA5QK3_w)
