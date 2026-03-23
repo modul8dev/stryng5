@@ -1,0 +1,146 @@
+<main>
+<div class="p-6 max-w-2xl mx-auto">
+    <h2 class="text-xl font-bold mb-4">
+        {% if is_edit %}Edit Image Group{% else %}New Image Group{% endif %}
+    </h2>
+
+    <form method="post"
+          enctype="multipart/form-data"
+          up-submit
+          up-layer="current"
+          {% if is_edit %}
+          up-target=".modal-form"
+          {% endif %}>
+        {% csrf_token %}
+
+        {# ── Title field ── #}
+        <div class="form-control w-full mb-4">
+            <label class="label" for="id_title">
+                <span class="label-text font-medium">Title <span class="text-error">*</span></span>
+            </label>
+            {{ form.title }}
+            {% if form.title.errors %}
+            <label class="label">
+                {% for error in form.title.errors %}
+                <span class="label-text-alt text-error">{{ error }}</span>
+                {% endfor %}
+            </label>
+            {% endif %}
+        </div>
+
+        {# ── Description field ── #}
+        <div class="form-control w-full mb-6">
+            <label class="label" for="id_description">
+                <span class="label-text font-medium">Description</span>
+            </label>
+            {{ form.description }}
+            {% if form.description.errors %}
+            <label class="label">
+                {% for error in form.description.errors %}
+                <span class="label-text-alt text-error">{{ error }}</span>
+                {% endfor %}
+            </label>
+            {% endif %}
+        </div>
+
+        {# ── Images section ── #}
+        <div class="divider">Images</div>
+
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+        <div class="alert alert-error mb-4">
+            {% for error in formset.non_form_errors %}
+            <span>{{ error }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div id="formset-container" class="space-y-4 mb-4">
+            {% for image_form in formset %}
+            <div class="image-row card card-border bg-base-200 p-4" data-index="{{ forloop.counter0 }}">
+                <div class="flex gap-4 items-start">
+                    {# Preview #}
+                    <div class="preview-container w-24 h-24 rounded-lg overflow-hidden bg-base-300 flex items-center justify-center flex-shrink-0">
+                        {% if image_form.instance.pk and image_form.instance.image %}
+                        <img src="{{ image_form.instance.image.url }}"
+                             alt="Preview"
+                             class="preview-img w-full h-full object-cover">
+                        {% else %}
+                        <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
+                        <span class="no-preview text-base-content/30 text-xs">No image</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        {# Hidden fields (id, etc.) #}
+                        {% for hidden in image_form.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+
+                        {# File input #}
+                        {{ image_form.image }}
+
+                        {% if image_form.image.errors %}
+                        <div class="text-error text-sm">
+                            {% for error in image_form.image.errors %}
+                            <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {# Delete button #}
+                    <div class="flex-shrink-0">
+                        {% if image_form.instance.pk %}
+                        <label class="btn btn-sm btn-error btn-outline delete-toggle cursor-pointer"
+                               title="Mark for deletion">
+                            {{ image_form.DELETE }}
+                            <span class="delete-label">✕</span>
+                        </label>
+                        {% else %}
+                        <button type="button"
+                                class="btn btn-sm btn-error btn-outline remove-row"
+                                title="Remove">
+                            ✕
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" id="add-image" class="btn btn-sm btn-outline btn-accent mb-6">
+            + Add Image
+        </button>
+
+        {# ── Empty form template for JS cloning ── #}
+        <template id="empty-form">
+            <div class="image-row card card-border bg-base-200 p-4">
+                <div class="flex gap-4 items-start">
+                    <div class="preview-container w-24 h-24 rounded-lg overflow-hidden bg-base-300 flex items-center justify-center flex-shrink-0">
+                        <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
+                        <span class="no-preview text-base-content/30 text-xs">No image</span>
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        {{ formset.empty_form.image }}
+                    </div>
+                    <div class="flex-shrink-0">
+                        <button type="button"
+                                class="btn btn-sm btn-error btn-outline remove-row"
+                                title="Remove">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        {# ── Submit ── #}
+        <div class="flex justify-end gap-2 mt-6">
+            <button type="button" class="btn btn-ghost" up-dismiss>Cancel</button>
+            <button type="submit" class="btn btn-primary">
+                {% if is_edit %}Save Changes{% else %}Create Group{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+</main>
