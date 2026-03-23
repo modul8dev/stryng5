@@ -26,3 +26,4 @@
 ## Pitfalls
 - Most Django commands fail if run from the workspace root; run them from `webapp/`.
 - README examples may imply different paths; trust repository layout (`webapp/manage.py`) when in doubt.
+- unpoly.compiler cannot be located in fragment since unpoly does not execute scritp tags in fragments. If you need to use unpoly.compiler, you must include it in the base template and ensure it is available globally.

@@ -119,3 +119,11 @@ up.compiler('#formset-container', function (container) {
   });
 
 });
+
+up.compiler('#shopify-import-form', function (form) {
+  form.addEventListener('submit', function () {
+    form.querySelector('#url-field').style.display = 'none';
+    form.querySelector('#form-actions').style.display = 'none';
+    form.querySelector('#import-spinner').style.display = 'flex';
+  });
+});
