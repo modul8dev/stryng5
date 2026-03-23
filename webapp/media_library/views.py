@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -14,17 +15,21 @@ def _accept_layer_response():
     return response
 
 
+@login_required
 def image_group_list(request):
-    groups = ImageGroup.objects.prefetch_related('images').all()
+    groups = ImageGroup.objects.filter(user=request.user).prefetch_related('images')
     return render(request, 'media_library/image_group_list.html', {'groups': groups})
 
 
+@login_required
 def image_group_create(request):
     if request.method == 'POST':
         form = ImageGroupForm(request.POST)
         formset = ImageFormSet(request.POST, request.FILES)
         if form.is_valid() and formset.is_valid():
-            group = form.save()
+            group = form.save(commit=False)
+            group.user = request.user
+            group.save()
             formset.instance = group
             formset.save()
             return _accept_layer_response()
@@ -38,8 +43,9 @@ def image_group_create(request):
     })
 
 
+@login_required
 def image_group_edit(request, pk):
-    group = get_object_or_404(ImageGroup, pk=pk)
+    group = get_object_or_404(ImageGroup, pk=pk, user=request.user)
     if request.method == 'POST':
         form = ImageGroupForm(request.POST, instance=group)
         formset = ImageFormSet(request.POST, request.FILES, instance=group)
@@ -58,9 +64,10 @@ def image_group_edit(request, pk):
     })
 
 
+@login_required
 @require_POST
 def image_group_delete(request, pk):
-    group = get_object_or_404(ImageGroup, pk=pk)
+    group = get_object_or_404(ImageGroup, pk=pk, user=request.user)
     group.delete()
     response = redirect(reverse('media_library:image_group_list'))
     response['X-Up-Events'] = '[{"type":"media_library:changed"}]'
