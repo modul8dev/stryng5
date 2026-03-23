@@ -53,6 +53,25 @@ up.compiler('#formset-container', function (container) {
 
       container.appendChild(clone);
       setTotalForms(idx + 1);
+
+      var newRow = container.lastElementChild;
+      var fileInput = newRow.querySelector('input[type="file"]');
+      if (fileInput) {
+        var cancelHandler = function () {
+          setTimeout(function () {
+            if (!fileInput.files || fileInput.files.length === 0) {
+              newRow.remove();
+              setTotalForms(getTotalForms() - 1);
+            }
+          }, 300);
+        };
+        fileInput.addEventListener('change', function () {
+          window.removeEventListener('focus', cancelHandler);
+          previewImage(fileInput);
+        }, { once: true });
+        window.addEventListener('focus', cancelHandler, { once: true });
+        fileInput.click();
+      }
     });
   }
 
@@ -83,7 +102,7 @@ up.compiler('#formset-container', function (container) {
     if (checkbox.checked) {
       row.classList.add('opacity-40');
       label.classList.remove('btn-outline');
-      label.querySelector('.delete-label').textContent = 'Undo';
+      label.querySelector('.delete-label').textContent = '↺';
     } else {
       row.classList.remove('opacity-40');
       label.classList.add('btn-outline');

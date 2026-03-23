@@ -55,55 +55,46 @@
         </div>
         {% endif %}
 
-        <div id="formset-container" class="space-y-4 mb-4">
+        <div id="formset-container" class="flex flex-wrap gap-4 mb-4">
             {% for image_form in formset %}
-            <div class="image-row card card-border bg-base-200 p-4" data-index="{{ forloop.counter0 }}">
-                <div class="flex gap-4 items-start">
-                    {# Preview #}
-                    <div class="preview-container w-24 h-24 rounded-lg overflow-hidden bg-base-300 flex items-center justify-center flex-shrink-0">
-                        {% if image_form.instance.pk and image_form.instance.image %}
-                        <img src="{{ image_form.instance.image.url }}"
-                             alt="Preview"
-                             class="preview-img w-full h-full object-cover">
-                        {% else %}
-                        <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
-                        <span class="no-preview text-base-content/30 text-xs">No image</span>
-                        {% endif %}
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        {# Hidden fields (id, etc.) #}
-                        {% for hidden in image_form.hidden_fields %}
-                            {{ hidden }}
-                        {% endfor %}
-
-                        {# File input #}
-                        {{ image_form.image }}
-
-                        {% if image_form.image.errors %}
-                        <div class="text-error text-sm">
-                            {% for error in image_form.image.errors %}
-                            <p>{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {# Delete button #}
-                    <div class="flex-shrink-0">
-                        {% if image_form.instance.pk %}
-                        <label class="btn btn-sm btn-error btn-outline delete-toggle cursor-pointer"
-                               title="Mark for deletion">
-                            {{ image_form.DELETE }}
-                            <span class="delete-label">✕</span>
-                        </label>
-                        {% else %}
-                        <button type="button"
-                                class="btn btn-sm btn-error btn-outline remove-row"
-                                title="Remove">
-                            ✕
-                        </button>
-                        {% endif %}
-                    </div>
+            <div class="image-row relative w-24 h-24 flex-shrink-0" data-index="{{ forloop.counter0 }}">
+                <div class="w-full h-full rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
+                    {% if image_form.instance.pk and image_form.instance.image %}
+                    <img src="{{ image_form.instance.image.url }}"
+                         alt="Preview"
+                         class="preview-img w-full h-full object-cover">
+                    {% else %}
+                    <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
+                    <span class="no-preview text-base-content/30 text-xs">No image</span>
+                    {% endif %}
                 </div>
+                {# Hidden fields (id, etc.) #}
+                {% for hidden in image_form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+                {# Hidden file input #}
+                <div class="hidden">{{ image_form.image }}</div>
+                {% if image_form.image.errors %}
+                <div class="text-error text-xs absolute bottom-0 left-0 right-0 text-center bg-error/10 rounded">
+                    {% for error in image_form.image.errors %}
+                    <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {# Delete button #}
+                {% if image_form.instance.pk %}
+                <label class="btn btn-circle btn-xs btn-error delete-toggle absolute -top-2 -right-2 cursor-pointer"
+                       title="Mark for deletion">
+                    {{ image_form.DELETE }}
+                    <span class="delete-label">✕</span>
+                </label>
+                {% else %}
+                <button type="button"
+                        class="btn btn-circle btn-xs btn-error remove-row absolute -top-2 -right-2"
+                        title="Remove">
+                    ✕
+                </button>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -114,23 +105,17 @@
 
         {# ── Empty form template for JS cloning ── #}
         <template id="empty-form">
-            <div class="image-row card card-border bg-base-200 p-4">
-                <div class="flex gap-4 items-start">
-                    <div class="preview-container w-24 h-24 rounded-lg overflow-hidden bg-base-300 flex items-center justify-center flex-shrink-0">
-                        <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
-                        <span class="no-preview text-base-content/30 text-xs">No image</span>
-                    </div>
-                    <div class="flex-1 space-y-2">
-                        {{ formset.empty_form.image }}
-                    </div>
-                    <div class="flex-shrink-0">
-                        <button type="button"
-                                class="btn btn-sm btn-error btn-outline remove-row"
-                                title="Remove">
-                            ✕
-                        </button>
-                    </div>
+            <div class="image-row relative w-24 h-24 flex-shrink-0">
+                <div class="w-full h-full rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
+                    <img src="" alt="" class="preview-img w-full h-full object-cover hidden">
+                    <span class="no-preview text-base-content/30 text-xs">No image</span>
                 </div>
+                <div class="hidden">{{ formset.empty_form.image }}</div>
+                <button type="button"
+                        class="btn btn-circle btn-xs btn-error remove-row absolute -top-2 -right-2"
+                        title="Remove">
+                    ✕
+                </button>
             </div>
         </template>
 
