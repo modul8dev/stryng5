@@ -1,5 +1,7 @@
 import json
-from urllib.parse import urlparse
+import os
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
 
 import requests as http_requests
 from django.contrib.auth.decorators import login_required
@@ -194,3 +196,99 @@ def shopify_import(request):
         })
 
     return render(request, 'media_library/shopify_import.html')
+
+
+class _ImgSrcParser(HTMLParser):
+    """Minimal HTML parser that collects all img src attributes."""
+
+    def __init__(self):
+        super().__init__()
+        self.srcs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'img':
+            attrs_dict = dict(attrs)
+            src = attrs_dict.get('src', '').strip()
+            if src:
+                self.srcs.append(src)
+
+
+def _import_url_images(user, page_url):
+    """
+    Scrape a URL with Firecrawl and create a manual ImageGroup with all found images.
+    Returns (success: bool, error: str | None).
+    """
+    api_key = os.environ.get('FIRECRAWL_API_KEY', '')
+    if not api_key:
+        return False, 'FIRECRAWL_API_KEY is not configured.'
+
+    from firecrawl import Firecrawl  # noqa: import here to avoid startup cost
+    fc = Firecrawl(api_key=api_key)
+
+    try:
+        result = fc.scrape(page_url, formats=['html'])
+    except Exception as exc:
+        return False, f'Failed to scrape page: {exc}'
+
+    html_content = getattr(result, 'html', None) or (result.get('html') if isinstance(result, dict) else None) or ''
+
+    parser = _ImgSrcParser()
+    parser.feed(html_content)
+    raw_srcs = parser.srcs
+
+    # Resolve relative URLs against the page URL
+    image_urls = []
+    for src in raw_srcs:
+        if src.startswith('data:'):
+            continue
+        absolute = urljoin(page_url, src)
+        image_urls.append(absolute)
+
+    if not image_urls:
+        return False, 'No images found on the page.'
+
+    # Derive a title from the scraped page metadata or the domain
+    title = getattr(result, 'metadata', None)
+    if isinstance(title, dict):
+        title = title.get('title', '')
+    elif hasattr(title, 'title'):
+        title = title.title or ''
+    else:
+        title = ''
+    if not title:
+        title = urlparse(page_url).hostname or page_url
+
+    group = ImageGroup.objects.create(
+        user=user,
+        title=title,
+        type=ImageGroup.GroupType.MANUAL,
+    )
+    for url in image_urls:
+        Image.objects.create(image_group=group, external_url=url)
+
+    return True, None
+
+
+@login_required
+def url_import(request):
+    if request.method == 'POST':
+        page_url = request.POST.get('page_url', '').strip()
+        validate = URLValidator()
+        try:
+            validate(page_url)
+        except ValidationError:
+            return render(request, 'media_library/url_import.html', {
+                'error': 'Please enter a valid URL.',
+                'page_url': page_url,
+            })
+
+        success, error = _import_url_images(request.user, page_url)
+        if success:
+            return _accept_layer_response()
+
+        return render(request, 'media_library/url_import.html', {
+            'error': error,
+            'page_url': page_url,
+        })
+
+    return render(request, 'media_library/url_import.html')

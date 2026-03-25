@@ -1,0 +1,46 @@
+<main>
+<div class="p-6 max-w-lg mx-auto">
+    <h2 class="text-xl font-bold mb-2">Import from URL</h2>
+    <p class="text-sm text-zinc-500 mb-6">Enter a webpage URL to scrape and import all images as a new image group.</p>
+
+    {% if error %}
+    <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post"
+          up-submit
+          up-layer="current"
+          id="url-import-form">
+        {% csrf_token %}
+
+        <div id="url-field" class="form-control w-full mb-6">
+            <label class="label" for="page_url">
+                <span class="label-text font-medium">Page URL</span>
+            </label>
+            <input type="url"
+                   name="page_url"
+                   id="page_url"
+                   class="input input-bordered w-full"
+                   placeholder="https://example.com/products"
+                   value="{{ page_url|default:'' }}"
+                   required>
+            <label class="label">
+                <span class="label-text-alt text-zinc-400">All images found on the page will be imported.</span>
+            </label>
+        </div>
+
+        <div id="import-spinner" style="display:none" class="flex-col items-center justify-center py-8">
+            <span class="loading loading-spinner loading-lg text-indigo-600"></span>
+            <p class="mt-4 text-sm text-zinc-500">Scraping page for images…</p>
+            <p class="mt-1 text-xs text-zinc-400">This may take a moment.</p>
+        </div>
+
+        <div id="form-actions" class="flex justify-end gap-2">
+            <button type="button" class="btn btn-ghost" up-dismiss>Cancel</button>
+            <button type="submit" class="btn btn-primary" onclick="document.getElementById('import-spinner').style.display='flex';document.getElementById('form-actions').style.display='none'">Import</button>
+        </div>
+    </form>
+</div>
+</main>

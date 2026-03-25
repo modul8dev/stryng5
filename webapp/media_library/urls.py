@@ -9,6 +9,7 @@ urlpatterns = [
     path('create/', views.image_group_create, name='image_group_create'),
     path('add-url-image/', views.add_url_image, name='add_url_image'),
     path('import-shopify/', views.shopify_import, name='shopify_import'),
+    path('import-url/', views.url_import, name='url_import'),
     path('<int:pk>/edit/', views.image_group_edit, name='image_group_edit'),
     path('<int:pk>/delete/', views.image_group_delete, name='image_group_delete'),
 ]
