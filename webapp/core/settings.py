@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'brand',
     'social_media',
     'media_library',
     'home',
@@ -152,6 +153,7 @@ AUTHENTICATION_BACKENDS = [
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
+ACCOUNT_ADAPTER = 'brand.adapter.BrandAccountAdapter'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # django-allauth

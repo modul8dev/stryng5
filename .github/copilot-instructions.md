@@ -23,6 +23,8 @@
 - Preserve existing Unpoly navigation attributes (`up-nav`, `up-follow`, `up-main`) in template updates.
 - Use app-local templates and static assets instead of adding one-off files in unrelated directories.
 - When fragment is to be rendered in a modal, use `up-mode="modal"` and `up-history="false"` on the trigger link to prevent URL changes.
+- keep business logic in views and models
+- Views are only responsible for rendering templates and handling requests; complex logic should be in models or separate service/helper functions.
 
 ## Pitfalls
 - Most Django commands fail if run from the workspace root; run them from `webapp/`.
