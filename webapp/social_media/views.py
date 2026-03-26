@@ -1,13 +1,16 @@
 import json
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.forms import inlineformset_factory
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from brand.models import Brand
 from media_library.models import Image, ImageGroup
+from .ai_services import suggest_topic, generate_post_text, generate_post_image, edit_text
 from .forms import (
     SharedMediaFormSet,
     SocialMediaPostForm,
@@ -17,6 +20,7 @@ from .models import (
     PLATFORM_CHOICES,
     SocialMediaPost,
     SocialMediaPostPlatform,
+    SocialMediaPostSeedImage,
     SocialMediaPlatformMedia,
     SocialMediaSettings,
 )
@@ -59,6 +63,22 @@ def _save_platform_override_media(request, post):
                     image_id=image_id,
                     sort_order=sort_order,
                 )
+
+
+def _save_seed_images(request, post):
+    raw = request.POST.get('seed_images_json', '[]')
+    try:
+        image_ids = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return
+    post.seed_images.all().delete()
+    for sort_order, image_id in enumerate(image_ids):
+        if image_id:
+            SocialMediaPostSeedImage.objects.create(
+                post=post,
+                image_id=image_id,
+                sort_order=sort_order,
+            )
 
 
 def _get_platform_label(key):
@@ -109,6 +129,7 @@ def post_create(request):
             media_formset.instance = post
             media_formset.save()
             _save_platform_override_media(request, post)
+            _save_seed_images(request, post)
             return _accept_layer_response()
     else:
         form = SocialMediaPostForm()
@@ -136,6 +157,7 @@ def post_create(request):
         'user_images': user_images,
         'selected_shared_media': [],
         'selected_platform_media': {},
+        'selected_seed_images': [],
         'is_edit': False,
     })
 
@@ -158,6 +180,7 @@ def post_edit(request, pk):
             platform_formset.save()
             media_formset.save()
             _save_platform_override_media(request, post)
+            _save_seed_images(request, post)
             return _accept_layer_response()
     else:
         form = SocialMediaPostForm(instance=post)
@@ -181,6 +204,11 @@ def post_edit(request, pk):
             for m in pv.override_media.order_by('sort_order')
         ]
 
+    selected_seed_images = [
+        {'image_id': s.image_id, 'url': s.image.url}
+        for s in post.seed_images.select_related('image').order_by('sort_order')
+    ]
+
     return render(request, 'social_media/post_form.html', {
         'form': form,
         'platform_formset': platform_formset,
@@ -190,6 +218,7 @@ def post_edit(request, pk):
         'user_images': user_images,
         'selected_shared_media': selected_shared_media,
         'selected_platform_media': platform_override_media,
+        'selected_seed_images': selected_seed_images,
         'post': post,
         'is_edit': True,
     })
@@ -204,3 +233,118 @@ def post_delete(request, pk):
     response = redirect(reverse('social_media:post_list'))
     response['X-Up-Events'] = '[{"type":"social_media:changed"}]'
     return response
+
+
+logger = logging.getLogger(__name__)
+
+
+def _get_user_brand(user):
+    try:
+        return Brand.objects.get(user=user)
+    except Brand.DoesNotExist:
+        return None
+
+
+def _parse_json_body(request):
+    try:
+        return json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+@login_required
+@require_POST
+def ai_suggest_topic(request):
+    data = _parse_json_body(request)
+    if not data:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    brand = _get_user_brand(request.user)
+    if not brand:
+        return JsonResponse({'error': 'Brand not configured'}, status=400)
+
+    seed_image_ids = data.get('seed_image_ids', [])
+    seed_images = list(
+        Image.objects.filter(
+            id__in=seed_image_ids,
+            image_group__user=request.user,
+        )
+    ) if seed_image_ids else []
+
+    try:
+        topic = suggest_topic(brand, seed_images)
+        return JsonResponse({'topic': topic})
+    except Exception:
+        logger.exception('Failed to suggest topic')
+        return JsonResponse({'error': 'Failed to suggest topic'}, status=500)
+
+
+@login_required
+@require_POST
+def ai_generate(request):
+    data = _parse_json_body(request)
+    if not data:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    brand = _get_user_brand(request.user)
+    if not brand:
+        return JsonResponse({'error': 'Brand not configured'}, status=400)
+
+    topic = data.get('topic', '')
+    post_type = data.get('post_type', '')
+    platforms = data.get('platforms', [])
+    seed_image_ids = data.get('seed_image_ids', [])
+
+    seed_images = list(
+        Image.objects.filter(
+            id__in=seed_image_ids,
+            image_group__user=request.user,
+        )
+    ) if seed_image_ids else []
+
+    result = {}
+
+    try:
+        result['text'] = generate_post_text(brand, topic, post_type, seed_images, platforms)
+    except Exception:
+        logger.exception('Failed to generate post text')
+        return JsonResponse({'error': 'Failed to generate text'}, status=500)
+
+    try:
+        image = generate_post_image(brand, topic, post_type, seed_images, request.user)
+        if image:
+            result['image'] = {'id': image.id, 'url': image.url}
+    except Exception:
+        logger.exception('Failed to generate image (text was generated successfully)')
+        # Non-fatal: text was already generated
+
+    return JsonResponse(result)
+
+
+@login_required
+@require_POST
+def ai_edit_text(request):
+    data = _parse_json_body(request)
+    if not data:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    brand = _get_user_brand(request.user)
+    if not brand:
+        return JsonResponse({'error': 'Brand not configured'}, status=400)
+
+    action = data.get('action', '')
+    text = data.get('text', '')
+    platform = data.get('platform')
+    instruction = data.get('instruction')
+
+    if not action or not text:
+        return JsonResponse({'error': 'action and text are required'}, status=400)
+
+    try:
+        edited = edit_text(action, text, brand, platform=platform, instruction=instruction)
+        return JsonResponse({'text': edited})
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception:
+        logger.exception('Failed to edit text')
+        return JsonResponse({'error': 'Failed to edit text'}, status=500)

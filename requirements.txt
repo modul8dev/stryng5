@@ -8,3 +8,4 @@ sqlparse==0.5.3
 tzdata==2025.2
 firecrawl-py==4.20.0
 openai==2.29.0
+google-genai==1.20.0

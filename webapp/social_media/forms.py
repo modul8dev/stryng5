@@ -24,7 +24,7 @@ class SocialMediaSettingsForm(forms.ModelForm):
 class SocialMediaPostForm(forms.ModelForm):
     class Meta:
         model = SocialMediaPost
-        fields = ['title', 'shared_text', 'scheduled_at']
+        fields = ['title', 'shared_text', 'scheduled_at', 'topic', 'post_type', 'ai_instruction']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
@@ -40,6 +40,18 @@ class SocialMediaPostForm(forms.ModelForm):
                 'class': 'input input-bordered w-full',
                 'type': 'datetime-local',
             }, format='%Y-%m-%dT%H:%M'),
+            'topic': forms.TextInput(attrs={
+                'class': 'input input-bordered w-full',
+                'placeholder': 'Post topic…',
+            }),
+            'post_type': forms.Select(attrs={
+                'class': 'select select-bordered w-full',
+            }),
+            'ai_instruction': forms.Textarea(attrs={
+                'class': 'textarea textarea-bordered w-full',
+                'rows': 2,
+                'placeholder': 'Additional instructions for AI…',
+            }),
         }
 
     def __init__(self, *args, **kwargs):

@@ -58,6 +58,13 @@ class SocialMediaSettings(models.Model):
         return f'Social media settings for {self.user}'
 
 
+POST_TYPE_CHOICES = [
+    ('product', 'Product'),
+    ('lifestyle', 'Lifestyle'),
+    ('ad', 'Ad'),
+]
+
+
 class SocialMediaPost(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -66,6 +73,9 @@ class SocialMediaPost(models.Model):
     )
     title = models.CharField(max_length=200)
     shared_text = models.TextField(blank=True)
+    topic = models.CharField(max_length=300, blank=True)
+    post_type = models.CharField(max_length=20, choices=POST_TYPE_CHOICES, blank=True)
+    ai_instruction = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     scheduled_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
@@ -125,6 +135,25 @@ class SocialMediaPostMedia(models.Model):
 
     def __str__(self):
         return f'Shared media for {self.post.title}: {self.image}'
+
+
+class SocialMediaPostSeedImage(models.Model):
+    post = models.ForeignKey(
+        SocialMediaPost,
+        on_delete=models.CASCADE,
+        related_name='seed_images',
+    )
+    image = models.ForeignKey(
+        'media_library.Image',
+        on_delete=models.CASCADE,
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f'Seed image for {self.post.title}: {self.image}'
 
 
 class SocialMediaPlatformMedia(models.Model):

@@ -13,12 +13,25 @@ document.addEventListener('alpine:init', () => {
       instagram: 2200,
     },
 
+    // ── Mode state ────────────────────────────────────────────────────────
+    mode: 'ai',              // 'ai' or 'editor'
+
     activeTab: 'all',
     sharedText: '',
     overrideTextShown: {},
     overrideMediaShown: {},
     overrideText: {},
     textPrefilled: {},
+
+    // ── AI state ──────────────────────────────────────────────────────────
+    topic: '',
+    postType: '',
+    seedImages: [],           // [{imageId, url}]
+    generating: false,
+    generationStep: '',
+    aiProcessing: false,
+    suggestingTopic: false,
+    customInstruction: '',
 
     // ── Image state ───────────────────────────────────────────────────────
     sharedImages: [],        // [{mediaId, imageId, url}]
@@ -30,6 +43,26 @@ document.addEventListener('alpine:init', () => {
     init() {
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
+
+      // Determine initial mode: existing posts → editor, new → ai
+      const isEdit = this.$el.querySelector('[name="seed_images_json"]') !== null
+        && document.getElementById('selected-seed-images-json') !== null;
+      const hasExistingText = !!(ta && ta.value.trim());
+
+      // Check if this is an edit form (post already exists)
+      const postFormAction = document.getElementById('post-form')?.getAttribute('action') || '';
+      const editIndicator = this.$el.closest('[x-data]')?.querySelector('h2');
+      if (editIndicator && editIndicator.textContent.trim() === 'Edit Post') {
+        this.mode = 'editor';
+      } else {
+        this.mode = 'ai';
+      }
+
+      // Load topic and postType from hidden fields
+      const topicField = document.getElementById('id_topic');
+      if (topicField) this.topic = topicField.value || '';
+      const postTypeField = document.getElementById('id_post_type');
+      if (postTypeField) this.postType = postTypeField.value || '';
 
       this.$el.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
         const platform = panel.id.replace('panel-', '');
@@ -68,6 +101,16 @@ document.addEventListener('alpine:init', () => {
         }
       }
 
+      // Load seed images
+      const seedEl = document.getElementById('selected-seed-images-json');
+      if (seedEl) {
+        const data = JSON.parse(seedEl.textContent);
+        this.seedImages = data.map(item => ({
+          imageId: item.image_id,
+          url: item.url,
+        }));
+      }
+
       // Listen for image picker acceptance
       this._pickerHandler = (event) => {
         if (event.value) this.pickerAccepted(event.value);
@@ -82,6 +125,19 @@ document.addEventListener('alpine:init', () => {
 
     destroy() {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
+    },
+
+    // ── Mode switching ────────────────────────────────────────────────────
+
+    switchMode(newMode) {
+      this.mode = newMode;
+    },
+
+    // ── Hidden field sync ─────────────────────────────────────────────────
+
+    syncHiddenField(fieldId, value) {
+      const el = document.getElementById(fieldId);
+      if (el) el.value = value;
     },
 
     // ── Tab management ────────────────────────────────────────────────────
@@ -177,12 +233,207 @@ document.addEventListener('alpine:init', () => {
       this.overrideTextShown[platform] = !checked;
     },
 
+    // ── AI: Suggest Topic ─────────────────────────────────────────────────
+
+    async suggestTopic() {
+      if (this.suggestingTopic) return;
+      this.suggestingTopic = true;
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        const resp = await fetch('/social-media/ai/suggest-topic/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify({
+            seed_image_ids: this.seedImages.map(i => i.imageId),
+          }),
+        });
+        const data = await resp.json();
+        if (data.topic) {
+          this.topic = data.topic;
+          this.syncHiddenField('id_topic', this.topic);
+        }
+      } catch (e) {
+        console.error('Failed to suggest topic:', e);
+      } finally {
+        this.suggestingTopic = false;
+      }
+    },
+
+    // ── AI: Generate Post ─────────────────────────────────────────────────
+
+    async generatePost() {
+      if (this.generating) return;
+      this.generating = true;
+      this.generationStep = 'Generating text…';
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        // Collect enabled platforms from the form
+        const platformCheckboxes = this.$el.querySelectorAll('[name$="-is_enabled"]');
+        const platforms = [];
+        this.$el.querySelectorAll('[name$="-platform"]').forEach((input, idx) => {
+          const checkbox = platformCheckboxes[idx];
+          if (checkbox && checkbox.checked) {
+            platforms.push(input.value);
+          }
+        });
+
+        this.generationStep = 'Generating text & image…';
+        const resp = await fetch('/social-media/ai/generate/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify({
+            topic: this.topic,
+            post_type: this.postType,
+            seed_image_ids: this.seedImages.map(i => i.imageId),
+            platforms: platforms,
+          }),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+          console.error('Generation error:', data.error);
+          return;
+        }
+
+        // Populate text
+        if (data.text) {
+          this.sharedText = data.text;
+          const ta = this.$el.querySelector('#id_shared_text');
+          if (ta) ta.value = data.text;
+        }
+
+        // Add generated image to shared images
+        if (data.image) {
+          this.sharedImages = [
+            ...this.sharedImages,
+            { mediaId: null, imageId: data.image.id, url: data.image.url },
+          ];
+          this.syncSharedMediaFormset();
+        }
+
+        // Switch to editor mode
+        this.mode = 'editor';
+      } catch (e) {
+        console.error('Failed to generate post:', e);
+      } finally {
+        this.generating = false;
+        this.generationStep = '';
+      }
+    },
+
+    // ── AI: Edit Action ───────────────────────────────────────────────────
+
+    async aiEditAction(action) {
+      const ta = this.$el.querySelector('#id_shared_text');
+      if (!ta) return;
+
+      const text = ta.selectionStart !== ta.selectionEnd
+        ? ta.value.substring(ta.selectionStart, ta.selectionEnd)
+        : ta.value;
+
+      if (!text.trim()) return;
+
+      this.aiProcessing = true;
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        const resp = await fetch('/social-media/ai/edit-text/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify({
+            action: action,
+            text: text,
+            platform: this.activeTab !== 'all' ? this.activeTab : undefined,
+          }),
+        });
+        const data = await resp.json();
+        if (data.text) {
+          if (ta.selectionStart !== ta.selectionEnd) {
+            // Replace selection
+            const before = ta.value.substring(0, ta.selectionStart);
+            const after = ta.value.substring(ta.selectionEnd);
+            ta.value = before + data.text + after;
+          } else {
+            ta.value = data.text;
+          }
+          this.sharedText = ta.value;
+        }
+      } catch (e) {
+        console.error('Failed to edit text:', e);
+      } finally {
+        this.aiProcessing = false;
+      }
+    },
+
+    // ── AI: Custom Instruction ────────────────────────────────────────────
+
+    async aiCustomInstruction(insertMode) {
+      const ta = this.$el.querySelector('#id_shared_text');
+      if (!ta || !this.customInstruction.trim()) return;
+
+      const text = ta.value;
+      if (!text.trim() && insertMode === 'replace') return;
+
+      this.aiProcessing = true;
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        const resp = await fetch('/social-media/ai/edit-text/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify({
+            action: 'freeform',
+            text: text || '(empty post)',
+            instruction: this.customInstruction,
+          }),
+        });
+        const data = await resp.json();
+        if (data.text) {
+          if (insertMode === 'replace') {
+            ta.value = data.text;
+          } else if (insertMode === 'insert') {
+            const pos = ta.selectionStart;
+            ta.value = ta.value.substring(0, pos) + data.text + ta.value.substring(pos);
+          } else if (insertMode === 'append') {
+            ta.value = ta.value + (ta.value ? '\n\n' : '') + data.text;
+          }
+          this.sharedText = ta.value;
+          this.customInstruction = '';
+        }
+      } catch (e) {
+        console.error('Failed to apply custom instruction:', e);
+      } finally {
+        this.aiProcessing = false;
+      }
+    },
+
+    // ── Seed Image Management ─────────────────────────────────────────────
+
+    removeSeedImage(imageId) {
+      this.seedImages = this.seedImages.filter(i => i.imageId !== imageId);
+    },
+
     // ── Image Picker (Unpoly modal) ───────────────────────────────────────
 
     openPicker(target) {
-      const currentImages = target === 'shared'
-        ? this.sharedImages
-        : (this.platformImages[target.replace('platform:', '')] || []);
+      let currentImages;
+      if (target === 'seed') {
+        currentImages = this.seedImages;
+      } else if (target === 'shared') {
+        currentImages = this.sharedImages;
+      } else {
+        currentImages = this.platformImages[target.replace('platform:', '')] || [];
+      }
       const selectedIds = currentImages.map(i => i.imageId).join(',');
       up.layer.open({
         url: `/media-library/image-picker/?target=${encodeURIComponent(target)}&selected=${selectedIds}`,
@@ -194,6 +445,19 @@ document.addEventListener('alpine:init', () => {
     },
 
     pickerAccepted({ target, imageIds, urls }) {
+      if (target === 'seed') {
+        // Seed images: replace fully
+        this.seedImages = imageIds.map(id => ({
+          imageId: id,
+          url: urls[id],
+        }));
+        // Auto-suggest topic when seed images change
+        if (this.seedImages.length > 0 && !this.topic) {
+          this.suggestTopic();
+        }
+        return;
+      }
+
       if (target === 'shared') {
         const newShared = this.sharedImages.filter(img => {
           if (!imageIds.includes(img.imageId)) {

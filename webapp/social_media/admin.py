@@ -5,6 +5,7 @@ from .models import (
     SocialMediaPost,
     SocialMediaPostPlatform,
     SocialMediaPostMedia,
+    SocialMediaPostSeedImage,
     SocialMediaPlatformMedia,
 )
 
@@ -19,11 +20,16 @@ class SocialMediaPostMediaInline(admin.TabularInline):
     extra = 0
 
 
+class SocialMediaPostSeedImageInline(admin.TabularInline):
+    model = SocialMediaPostSeedImage
+    extra = 0
+
+
 @admin.register(SocialMediaPost)
 class SocialMediaPostAdmin(admin.ModelAdmin):
     list_display = ['title', 'user', 'status', 'created_at']
     list_filter = ['status']
-    inlines = [SocialMediaPostPlatformInline, SocialMediaPostMediaInline]
+    inlines = [SocialMediaPostPlatformInline, SocialMediaPostMediaInline, SocialMediaPostSeedImageInline]
 
 
 @admin.register(SocialMediaSettings)
