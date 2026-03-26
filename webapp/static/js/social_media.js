@@ -65,11 +65,15 @@ document.addEventListener('alpine:init', () => {
 
     confirm() {
       const urlMap = {};
-      this.groups.forEach(g => g.images.forEach(img => { urlMap[img.id] = img.url; }));
+      const groupMap = {};
+      this.groups.forEach(g => g.images.forEach(img => {
+        urlMap[img.id] = img.url;
+        groupMap[img.id] = g.id;
+      }));
       const imageIds = Object.entries(this.selected)
         .filter(([, v]) => v)
         .map(([id]) => parseInt(id, 10));
-      up.layer.accept({ target: this.target, imageIds, urls: urlMap });
+      up.layer.accept({ target: this.target, imageIds, urls: urlMap, groupMap });
     },
 
     cancel() {

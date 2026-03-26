@@ -12,6 +12,7 @@ from media_library.models import Image, ImageGroup
 from media_library.views import _import_shopify_products, _import_url_images
 from prompts.brand_extract import BRAND_EXTRACT_PROMPT
 
+from media_library.models import ImageGroup
 from .forms import BrandForm, ScrapeURLForm
 from .models import Brand
 
@@ -124,18 +125,38 @@ def _scrape_brand_data(user, url):
 @login_required
 def brand_detail(request):
     brand, _ = Brand.objects.get_or_create(user=request.user)
+    edit_mode = request.GET.get('mode') == 'edit'
 
     if request.method == 'POST':
         form = BrandForm(request.POST, instance=brand, user=request.user)
         if form.is_valid():
             form.save()
             return redirect('brand:brand_detail')
+        else:
+            edit_mode = True
     else:
         form = BrandForm(instance=brand, user=request.user)
+
+    # Preview URL and image ID for the logo field (reflects current form value, not just saved brand).
+    logo_preview_url = ''
+    logo_image_id = ''
+    logo_value = form['logo'].value()
+    if logo_value:
+        try:
+            group = ImageGroup.objects.prefetch_related('images').get(pk=logo_value)
+            first_img = group.images.first()
+            if first_img:
+                logo_preview_url = first_img.url
+                logo_image_id = str(first_img.pk)
+        except (ImageGroup.DoesNotExist, ValueError):
+            pass
 
     return render(request, 'brand/brand_detail.html', {
         'brand': brand,
         'form': form,
+        'edit_mode': edit_mode,
+        'logo_preview_url': logo_preview_url,
+        'logo_image_id': logo_image_id,
     })
 
 
