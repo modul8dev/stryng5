@@ -67,7 +67,7 @@
                 <div class="image-row relative w-32 h-32 sm:w-36 sm:h-36 flex-shrink-0" data-index="{{ forloop.counter0 }}">
                     <div class="w-full h-full rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
                         {% if image_form.instance.pk and image_form.instance.url %}
-                        <img src="{{ image_form.instance.url }}"
+                        <preview-img src="{{ image_form.instance.url }}"
                              alt="Preview"
                              class="preview-img w-full h-full object-cover"
                              loading="lazy">

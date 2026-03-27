@@ -24,8 +24,10 @@ def _build_image_descriptions(seed_images):
         return ''
     lines = ['Seed images provided as context:']
     for i, img in enumerate(seed_images, 1):
-        label = str(img)
-        lines.append(f'  {i}. {label}')
+        description = str(img.image_group.description)
+        title = img.image_group.title
+        img_context = f'Title:{title} - Description:{description}' if description else title
+        lines.append(f'  {i}. {img_context}')
     return '\n'.join(lines)
 
 
@@ -39,7 +41,8 @@ def _get_brand_context(brand):
 
 
 def suggest_topic(brand, seed_images):
-    """Suggest a topic based on brand context and seed images."""
+    """Suggest topics based on brand context and seed images. Returns a list."""
+    import re
     client = _get_openai_client()
     ctx = _get_brand_context(brand)
     prompt = SOCIAL_MEDIA_TOPIC_PROMPT.format(
@@ -50,9 +53,18 @@ def suggest_topic(brand, seed_images):
         model='gpt-4o-mini',
         messages=[{'role': 'user', 'content': prompt}],
         temperature=0.7,
-        max_tokens=100,
+        max_tokens=300,
     )
-    return response.choices[0].message.content.strip()
+    raw = response.choices[0].message.content.strip()
+    topics = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        cleaned = re.sub(r'^\d+\.\s*', '', line)
+        if cleaned:
+            topics.append(cleaned)
+    return topics if topics else [raw]
 
 
 def generate_post_text(brand, topic, post_type, seed_images, platforms):
@@ -77,35 +89,77 @@ def generate_post_text(brand, topic, post_type, seed_images, platforms):
 
 def generate_post_image(brand, topic, post_type, seed_images, user):
     """Generate an image using Gemini and save it to the media library."""
+    from io import BytesIO
+    from PIL import Image as PILImage
+    from google.genai import types
+
     client = _get_gemini_client()
 
-    image_prompt = (
-        f"Create a social media image for brand '{brand.name or 'brand'}'. "
+    # Build pre-prompt: include seed image names/descriptions and instruct AI
+    seed_lines = []
+    if seed_images:
+        seed_lines.append('Reference images provided for context and style inspiration:')
+        for i, img in enumerate(seed_images, 1):
+            name = img.image.name.split('/')[-1] if img.image and img.image.name else str(img)
+            description = str(img)
+            seed_lines.append(f'  {i}. Name: {name} — {description}')
+        seed_lines.append(
+            'Use the reference images above to inform visual style, composition, and subject matter.'
+        )
+        seed_lines.append('')
+
+    pre_prompt = '\n'.join(seed_lines) if seed_lines else ''
+
+    prompt = (
+        f"{pre_prompt}"
+        f"Create a professional social media image for brand '{brand.name or 'brand'}'. "
         f"Topic: {topic or 'general'}. Post type: {post_type or 'lifestyle'}. "
-        f"Style: professional, clean, modern."
+        f"Style: {brand.style_guide or 'professional, clean, modern'}."
     )
 
-    response = client.models.generate_content(
-        model='gemini-3.1-flash-image-preview',
-        contents=image_prompt,
-        config={
-            'response_modalities': ['Image'],
-        },
-    )
+    # Open seed images as PIL images and pass alongside the prompt
+    import urllib.request
+    pil_images = []
+    try:
+        for img in (seed_images or []):
+            try:
+                if img.image and img.image.name:
+                    pil_images.append(PILImage.open(img.image.path))
+                elif img.external_url:
+                    with urllib.request.urlopen(img.external_url) as resp:  # noqa: S310
+                        pil_images.append(PILImage.open(BytesIO(resp.read())))
+            except Exception:
+                pass
 
-    # Extract image from response
+        contents = [prompt] + pil_images
+
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-image-preview',
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_modalities=['Image'],
+            ),
+        )
+    finally:
+        for pil_img in pil_images:
+            pil_img.close()
+
+    # Use the same image group as the seed images; fall back to a dedicated group
+    if seed_images:
+        group = seed_images[0].image_group
+    else:
+        group, _ = ImageGroup.objects.get_or_create(
+            user=user,
+            title='AI Generated Images',
+            type=ImageGroup.GroupType.MANUAL,
+        )
+
+    # Extract image from response and save to media library
     for part in response.candidates[0].content.parts:
         if part.inline_data is not None:
             image_data = part.inline_data.data
             mime_type = part.inline_data.mime_type
             ext = 'png' if 'png' in mime_type else 'jpg'
-
-            # Save to media library
-            group, _ = ImageGroup.objects.get_or_create(
-                user=user,
-                title='AI Generated Images',
-                type=ImageGroup.GroupType.MANUAL,
-            )
             image_obj = Image(image_group=group)
             filename = f'ai_generated.{ext}'
             image_obj.image.save(filename, ContentFile(image_data), save=True)

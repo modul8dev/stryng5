@@ -122,6 +122,8 @@ def post_create(request):
         if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
             post = form.save(commit=False)
             post.user = request.user
+            if not post.title:
+                post.title = 'Untitled'
             post.status = 'scheduled' if request.POST.get('action') == 'schedule' and post.scheduled_at else 'draft'
             post.save()
             platform_formset.instance = post
@@ -147,6 +149,7 @@ def post_create(request):
         mf.fields['image'].queryset = user_images
 
     platform_labels = {p: _get_platform_label(p) for p in enabled_platforms}
+    brand = _get_user_brand(request.user)
 
     return render(request, 'social_media/post_form.html', {
         'form': form,
@@ -158,6 +161,7 @@ def post_create(request):
         'selected_shared_media': [],
         'selected_platform_media': {},
         'selected_seed_images': [],
+        'brand': brand,
         'is_edit': False,
     })
 
@@ -174,6 +178,8 @@ def post_edit(request, pk):
         media_formset = SharedMediaFormSet(request.POST, instance=post, prefix='media')
         if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
             updated_post = form.save(commit=False)
+            if not updated_post.title:
+                updated_post.title = 'Untitled'
             if request.POST.get('action') == 'schedule' and updated_post.scheduled_at:
                 updated_post.status = 'scheduled'
             updated_post.save()
@@ -219,6 +225,7 @@ def post_edit(request, pk):
         'selected_shared_media': selected_shared_media,
         'selected_platform_media': platform_override_media,
         'selected_seed_images': selected_seed_images,
+        'brand': _get_user_brand(request.user),
         'post': post,
         'is_edit': True,
     })
@@ -272,8 +279,8 @@ def ai_suggest_topic(request):
     ) if seed_image_ids else []
 
     try:
-        topic = suggest_topic(brand, seed_images)
-        return JsonResponse({'topic': topic})
+        topics = suggest_topic(brand, seed_images)
+        return JsonResponse({'topics': topics})
     except Exception:
         logger.exception('Failed to suggest topic')
         return JsonResponse({'error': 'Failed to suggest topic'}, status=500)

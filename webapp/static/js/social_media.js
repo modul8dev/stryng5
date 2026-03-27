@@ -25,13 +25,19 @@ document.addEventListener('alpine:init', () => {
 
     // ── AI state ──────────────────────────────────────────────────────────
     topic: '',
-    postType: '',
+    postType: 'lifestyle',
     seedImages: [],           // [{imageId, url}]
     generating: false,
     generationStep: '',
     aiProcessing: false,
     suggestingTopic: false,
+    topicSuggestions: [],
     customInstruction: '',
+
+    // ── Preview carousel state ────────────────────────────────────────────
+    carouselIndex: 0,
+    carouselHover: false,
+    captionExpanded: false,
 
     // ── Image state ───────────────────────────────────────────────────────
     sharedImages: [],        // [{mediaId, imageId, url}]
@@ -62,7 +68,10 @@ document.addEventListener('alpine:init', () => {
       const topicField = document.getElementById('id_topic');
       if (topicField) this.topic = topicField.value || '';
       const postTypeField = document.getElementById('id_post_type');
-      if (postTypeField) this.postType = postTypeField.value || '';
+      if (postTypeField) {
+        this.postType = postTypeField.value || 'lifestyle';
+        postTypeField.value = this.postType;
+      }
 
       this.$el.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
         const platform = panel.id.replace('panel-', '');
@@ -168,6 +177,24 @@ document.addEventListener('alpine:init', () => {
       return this.sharedImages;
     },
 
+    // Reset carousel when images change
+    _resetCarousel() {
+      this.carouselIndex = 0;
+    },
+
+    previewTextFormatted() {
+      const text = this.effectiveText(this.activeTab);
+      if (!text) return '';
+      const escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      return escaped
+        .replace(/(#\w+)/g, '<span class="text-indigo-500 font-medium">$1</span>')
+        .replace(/(@\w+)/g, '<span class="text-sky-500 font-medium">$1</span>');
+    },
+
     // ── Text helpers ──────────────────────────────────────────────────────
 
     effectiveText(platform) {
@@ -219,9 +246,9 @@ document.addEventListener('alpine:init', () => {
 
     onSharedTextToggle(platform, event) {
       const checked = event.target.checked;
-      if (!checked && !this.textPrefilled[platform] && !this.overrideText[platform]) {
+      if (!checked && !this.overrideText[platform]) {
+        // Seed override textarea with current shared text as starting point
         this.overrideText[platform] = this.sharedText;
-        this.textPrefilled[platform] = true;
         this.$nextTick(() => {
           const panel = this.$el.querySelector('#panel-' + platform);
           if (panel) {
@@ -231,6 +258,19 @@ document.addEventListener('alpine:init', () => {
         });
       }
       this.overrideTextShown[platform] = !checked;
+    },
+
+    onSharedMediaToggle(platform, event) {
+      const checked = event.target.checked;
+      if (!checked && !(this.platformImages[platform] && this.platformImages[platform].length)) {
+        // Seed platform images with shared images as starting point
+        this.platformImages = {
+          ...this.platformImages,
+          [platform]: this.sharedImages.map(img => ({ mediaId: null, imageId: img.imageId, url: img.url })),
+        };
+        this.syncPlatformMediaJson();
+      }
+      this.overrideMediaShown[platform] = !checked;
     },
 
     // ── AI: Suggest Topic ─────────────────────────────────────────────────
@@ -251,15 +291,20 @@ document.addEventListener('alpine:init', () => {
           }),
         });
         const data = await resp.json();
-        if (data.topic) {
-          this.topic = data.topic;
-          this.syncHiddenField('id_topic', this.topic);
+        if (data.topics && data.topics.length) {
+          this.topicSuggestions = data.topics;
         }
       } catch (e) {
         console.error('Failed to suggest topic:', e);
       } finally {
         this.suggestingTopic = false;
       }
+    },
+
+    selectTopic(t) {
+      this.topic = t;
+      this.syncHiddenField('id_topic', t);
+      this.topicSuggestions = [];
     },
 
     // ── AI: Generate Post ─────────────────────────────────────────────────
@@ -270,17 +315,15 @@ document.addEventListener('alpine:init', () => {
       this.generationStep = 'Generating text…';
       try {
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-        // Collect enabled platforms from the form
-        const platformCheckboxes = this.$el.querySelectorAll('[name$="-is_enabled"]');
-        const platforms = [];
-        this.$el.querySelectorAll('[name$="-platform"]').forEach((input, idx) => {
-          const checkbox = platformCheckboxes[idx];
-          if (checkbox && checkbox.checked) {
-            platforms.push(input.value);
-          }
-        });
 
         this.generationStep = 'Generating text & image…';
+
+        // Collect all enabled platforms from hidden platform inputs
+        const platforms = [];
+        this.$el.querySelectorAll('[name$="-platform"]').forEach(input => {
+          if (input.value) platforms.push(input.value);
+        });
+
         const resp = await fetch('/social-media/ai/generate/', {
           method: 'POST',
           headers: {
@@ -304,8 +347,6 @@ document.addEventListener('alpine:init', () => {
         // Populate text
         if (data.text) {
           this.sharedText = data.text;
-          const ta = this.$el.querySelector('#id_shared_text');
-          if (ta) ta.value = data.text;
         }
 
         // Add generated image to shared images
@@ -315,6 +356,7 @@ document.addEventListener('alpine:init', () => {
             { mediaId: null, imageId: data.image.id, url: data.image.url },
           ];
           this.syncSharedMediaFormset();
+          this._resetCarousel();
         }
 
         // Switch to editor mode
@@ -327,10 +369,34 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    // ── Textarea helpers ──────────────────────────────────────────────────
+
+    // Return the textarea element for the given tab (defaults to activeTab).
+    getTextarea(platform) {
+      const p = platform !== undefined ? platform : this.activeTab;
+      if (!p || p === 'all') {
+        return this.$root.querySelector('#id_shared_text');
+      }
+      return this.$root.querySelector(`#panel-${p} .override-text-field`);
+    },
+
+    // Update textarea value + reactive state for the given tab.
+    updateText(platform, text) {
+      const p = platform !== undefined ? platform : this.activeTab;
+      const ta = this.getTextarea(p);
+      if (ta) ta.value = text;
+      if (!p || p === 'all') {
+        this.sharedText = text;
+      } else {
+        this.overrideText = { ...this.overrideText, [p]: text };
+      }
+    },
+
     // ── AI: Edit Action ───────────────────────────────────────────────────
 
     async aiEditAction(action) {
-      const ta = this.$el.querySelector('#id_shared_text');
+      const p = this.activeTab;
+      const ta = this.getTextarea(p);
       if (!ta) return;
 
       const text = ta.selectionStart !== ta.selectionEnd
@@ -351,20 +417,18 @@ document.addEventListener('alpine:init', () => {
           body: JSON.stringify({
             action: action,
             text: text,
-            platform: this.activeTab !== 'all' ? this.activeTab : undefined,
+            platform: p !== 'all' ? p : undefined,
           }),
         });
         const data = await resp.json();
         if (data.text) {
           if (ta.selectionStart !== ta.selectionEnd) {
-            // Replace selection
             const before = ta.value.substring(0, ta.selectionStart);
             const after = ta.value.substring(ta.selectionEnd);
-            ta.value = before + data.text + after;
+            this.updateText(p, before + data.text + after);
           } else {
-            ta.value = data.text;
+            this.updateText(p, data.text);
           }
-          this.sharedText = ta.value;
         }
       } catch (e) {
         console.error('Failed to edit text:', e);
@@ -376,7 +440,8 @@ document.addEventListener('alpine:init', () => {
     // ── AI: Custom Instruction ────────────────────────────────────────────
 
     async aiCustomInstruction(insertMode) {
-      const ta = this.$el.querySelector('#id_shared_text');
+      const p = this.activeTab;
+      const ta = this.getTextarea(p);
       if (!ta || !this.customInstruction.trim()) return;
 
       const text = ta.value;
@@ -399,15 +464,16 @@ document.addEventListener('alpine:init', () => {
         });
         const data = await resp.json();
         if (data.text) {
+          let newVal;
           if (insertMode === 'replace') {
-            ta.value = data.text;
+            newVal = data.text;
           } else if (insertMode === 'insert') {
             const pos = ta.selectionStart;
-            ta.value = ta.value.substring(0, pos) + data.text + ta.value.substring(pos);
+            newVal = ta.value.substring(0, pos) + data.text + ta.value.substring(pos);
           } else if (insertMode === 'append') {
-            ta.value = ta.value + (ta.value ? '\n\n' : '') + data.text;
+            newVal = ta.value + (ta.value ? '\n\n' : '') + data.text;
           }
-          this.sharedText = ta.value;
+          this.updateText(p, newVal);
           this.customInstruction = '';
         }
       } catch (e) {
@@ -476,6 +542,7 @@ document.addEventListener('alpine:init', () => {
         });
         this.sharedImages = newShared;
         this.syncSharedMediaFormset();
+        this._resetCarousel();
       } else {
         const platform = target.replace('platform:', '');
         const existing = this.platformImages[platform] || [];
@@ -501,6 +568,7 @@ document.addEventListener('alpine:init', () => {
       if (removed.mediaId) {
         this.deletedShared = [...this.deletedShared, { mediaId: removed.mediaId, imageId: removed.imageId }];
       }
+      this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, this.sharedImages.length - 1));
       this.syncSharedMediaFormset();
     },
 
@@ -508,10 +576,12 @@ document.addEventListener('alpine:init', () => {
 
     removePlatformImage(platform, imageId) {
       const list = this.platformImages[platform] || [];
+      const newList = list.filter(i => i.imageId !== imageId);
       this.platformImages = {
         ...this.platformImages,
-        [platform]: list.filter(i => i.imageId !== imageId),
+        [platform]: newList,
       };
+      this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, newList.length - 1));
       this.syncPlatformMediaJson();
     },
 

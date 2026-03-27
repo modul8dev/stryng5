@@ -35,6 +35,7 @@ class SocialMediaPostForm(forms.ModelForm):
                 'rows': 5,
                 'placeholder': 'Write your post content…',
                 'id': 'id_shared_text',
+                'x-model': 'sharedText',
             }),
             'scheduled_at': forms.DateTimeInput(attrs={
                 'class': 'input input-bordered w-full',
@@ -56,6 +57,7 @@ class SocialMediaPostForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['title'].required = False
         self.fields['scheduled_at'].required = False
         if self.instance and self.instance.scheduled_at:
             self.initial['scheduled_at'] = self.instance.scheduled_at.strftime('%Y-%m-%dT%H:%M')
@@ -64,10 +66,9 @@ class SocialMediaPostForm(forms.ModelForm):
 class SocialMediaPostPlatformForm(forms.ModelForm):
     class Meta:
         model = SocialMediaPostPlatform
-        fields = ['platform', 'is_enabled', 'use_shared_text', 'override_text', 'use_shared_media']
+        fields = ['platform', 'use_shared_text', 'override_text', 'use_shared_media']
         widgets = {
             'platform': forms.HiddenInput(),
-            'is_enabled': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
             'use_shared_text': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary use-shared-text-toggle'}),
             'override_text': forms.Textarea(attrs={
                 'class': 'textarea textarea-bordered w-full override-text-field',
