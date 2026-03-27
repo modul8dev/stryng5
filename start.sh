@@ -24,5 +24,6 @@ echo "==> Starting gunicorn on port 8100..."
 exec gunicorn core.wsgi:application \
     --bind 0.0.0.0:8100 \
     --workers 3 \
+    --timeout 120 \
     --access-logfile - \
     --error-logfile -
