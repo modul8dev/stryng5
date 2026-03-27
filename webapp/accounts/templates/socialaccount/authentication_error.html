@@ -1,0 +1,17 @@
+{% extends "account/base_auth.html" %}
+{% load i18n %}
+
+{% block title %}Sign-In Error{% endblock %}
+
+{% block card %}
+<div class="mb-4 flex justify-center">
+    <div class="flex size-10 items-center justify-center rounded-full bg-red-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+    </div>
+</div>
+<h2 class="mb-2 text-center text-lg font-semibold text-zinc-900">Sign-In Failed</h2>
+<p class="mb-6 text-center text-sm text-zinc-500">An error occurred while signing in with your third-party account. Please try again.</p>
+<a href="{% url 'account_login' %}" class="btn btn-primary btn-block rounded-lg text-sm">Back to Sign In</a>
+{% endblock %}
