@@ -30,6 +30,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-_xd9@pg$npr23(8dwldi%
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['*']
 
 
 # Application definition
