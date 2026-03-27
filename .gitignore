@@ -16,6 +16,7 @@ env/
 
 # Django
 
+/webapp/staticfiles/
 .env
 media/
 \*.log

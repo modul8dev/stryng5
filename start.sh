@@ -18,7 +18,7 @@ cd "$REPO_DIR/webapp"
 python manage.py migrate --noinput
 
 echo "==> Collecting static files..."
-python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput --ignore input.css
 
 echo "==> Starting gunicorn on port 8100..."
 exec gunicorn core.wsgi:application \

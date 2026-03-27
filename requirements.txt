@@ -1,4 +1,3 @@
-asgiref==3.8.1
 Django==6.0.3
 python-dotenv==1.2.2
 django-allauth[socialaccount]==65.15.0
