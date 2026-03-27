@@ -4,24 +4,24 @@
 #} -->
 
 {# AI preset actions toolbar #}
-<div class="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
-    <div class="flex flex-wrap gap-1.5">
+<div class="mb-1">
+    <div class="flex flex-wrap gap-1">
         <button type="button" @click="aiEditAction('rewrite')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Rewrite</button>
+                class="btn btn-xs btn-soft btn-primary">Rewrite</button>
         <button type="button" @click="aiEditAction('improve')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Improve</button>
+                class="btn btn-xs btn-soft btn-primary">Improve</button>
         <button type="button" @click="aiEditAction('shorten')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Shorten</button>
+                class="btn btn-xs btn-soft btn-primary">Shorten</button>
         <button type="button" @click="aiEditAction('expand')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Expand</button>
+                class="btn btn-xs btn-soft btn-primary">Expand</button>
         <button type="button" @click="aiEditAction('make_engaging')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Make engaging</button>
+                class="btn btn-xs btn-soft btn-primary">Make engaging</button>
         <button type="button" @click="aiEditAction('adapt_to_platform')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Adapt to platform</button>
+                class="btn btn-xs btn-soft btn-primary">Adapt to platform</button>
         <button type="button" @click="aiEditAction('add_cta')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Add CTA</button>
+                class="btn btn-xs btn-soft btn-primary">Add CTA</button>
         <button type="button" @click="aiEditAction('fix_grammar')" :disabled="aiProcessing"
-                class="rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 transition-colors">Fix grammar</button>
+                class="btn btn-xs btn-soft btn-primary">Fix grammar</button>
     </div>
     <div x-show="aiProcessing" class="mt-2 flex items-center gap-2 text-xs text-indigo-600">
         <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>

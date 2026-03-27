@@ -31,7 +31,7 @@
         <div class="flex items-center gap-2">
             <button type="button"
                     class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-                    up-dismiss>
+                    @click="confirmCancel()">
                 Cancel
             </button>
             <button type="submit" form="post-form" name="action" value="draft"
@@ -48,7 +48,7 @@
     </div>
 
     {# ── Generating overlay ── #}
-    <div x-show="generating" x-cloak class="flex flex-1 flex-col items-center justify-center gap-6 bg-white">
+    <div x-show="generating" x-cloak class="flex flex-1 flex-col items-center justify-center gap-6 bg-white mt-20">
         <svg class="animate-spin h-14 w-14 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -56,6 +56,12 @@
         <div class="text-center">
             <p class="text-base font-semibold text-zinc-800" x-text="generationStep">Generating…</p>
             <p class="mt-1 text-sm text-zinc-500">This may take a few moments…</p>
+        </div>
+        <div class="flex w-52 flex-col gap-4">
+            <div class="skeleton h-32 w-full"></div>
+            <div class="skeleton h-4 w-28"></div>
+            <div class="skeleton h-4 w-full"></div>
+            <div class="skeleton h-4 w-full"></div>
         </div>
     </div>
 
@@ -201,7 +207,7 @@
                 <div x-show="mode === 'editor'" x-cloak>
 
                     {# Title #}
-                    <div class="px-6 pt-6">
+                    <div class="px-6 pt-6 mb-5">
                         <label for="{{ form.title.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Title</label>
                         {{ form.title }}
                         {% if form.title.errors %}
@@ -256,34 +262,35 @@
                     {# ── All Platforms panel ── #}
                     <div class="tab-panel px-6 py-5" id="panel-all" x-show="activeTab === 'all'">
 
+                        {# Shared text #}
+                        <label for="{{ form.shared_text.id_for_label }}" class="block text-sm font-medium text-zinc-700 mb-1">Content</label>
+
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-zinc-400" id="shared-char-count" x-text="sharedCharCountLabel()">0 characters</span>
+                        </div>
                         {# AI toolbar #}
                         {% include "social_media/_ai_editor_tools.html" %}
 
-                        {# Shared text #}
-                        <div class="mb-3" @input.capture="sharedText = $event.target.value">
-                            <div class="flex items-center justify-between mb-1">
-                                <label for="{{ form.shared_text.id_for_label }}" class="block text-sm font-medium text-zinc-700">Content</label>
-                                <span class="text-xs text-zinc-400" id="shared-char-count" x-text="sharedCharCountLabel()">0 characters</span>
-                            </div>
+                        <div class="mb-1" @input.capture="sharedText = $event.target.value">
                             {{ form.shared_text }}
                             {% if form.shared_text.errors %}
                             <p class="mt-1 text-xs text-red-600">{{ form.shared_text.errors.0 }}</p>
                             {% endif %}
                         </div>
-
                         {# Freeform AI instruction #}
-                        <div class="mb-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                            <div class="flex gap-2">
+                        <div class="mb-5">
+                            <div class="flex gap-1">
                                 <input type="text" x-model="customInstruction"
                                        class="input input-bordered input-sm flex-1"
-                                       placeholder="Tell AI what to do with the text"
+                                       placeholder="Tell AI what to do with the text…"
                                        @keydown.enter.prevent="aiCustomInstruction('replace')" />
                                 <button type="button" @click="aiCustomInstruction('replace')" :disabled="aiProcessing || !customInstruction"
-                                        class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Replace</button>
-                                <button type="button" @click="aiCustomInstruction('insert')" :disabled="aiProcessing || !customInstruction"
-                                        class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Insert</button>
-                                <button type="button" @click="aiCustomInstruction('append')" :disabled="aiProcessing || !customInstruction"
-                                        class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Append</button>
+                                        class="btn btn-sm btn-soft btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                    </svg>
+                                    Apply to text
+                                </button>
                             </div>
                         </div>
 
@@ -330,17 +337,26 @@
                         {# ── TEXT SECTION ── #}
                         <div class="mb-5">
 
-                            {# "Use shared text" toggle header #}
-                            <div class="mb-3 flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                                <p class="text-sm font-medium text-zinc-700">Post text</p>
+                            {# Content label + char count + use-shared toggle #}
+                            <div class="flex items-center justify-start gap-5 mb-1">
+                                <label class="block text-sm font-medium text-zinc-700">Content</label>
                                 <label class="flex cursor-pointer items-center gap-2" @change="onSharedTextToggle('{{ platform }}', $event)">
                                     {{ pf.use_shared_text }}
                                     <span class="text-xs text-zinc-500">Use shared text</span>
                                 </label>
                             </div>
 
-                            {# Shared text view — disabled when "use shared" is checked #}
-                            <div x-show="!overrideTextShown['{{ platform }}']">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-zinc-400" x-text="charCount('{{ platform }}') + ' characters'"></span>
+                            </div>
+
+                            {# AI toolbar — only when override text is active #}
+                            <div x-show="overrideTextShown['{{ platform }}']">
+                                {% include "social_media/_ai_editor_tools.html" %}
+                            </div>
+
+                            {# Shared text view — when "use shared" is checked #}
+                            <div x-show="!overrideTextShown['{{ platform }}']" class="mb-1">
                                 <textarea readonly
                                           x-effect="$el.value = sharedText"
                                           class="textarea textarea-bordered w-full resize-none bg-zinc-50 opacity-60 cursor-not-allowed"
@@ -348,38 +364,28 @@
                                           placeholder="No shared text yet…"></textarea>
                             </div>
 
-                            {# Override editor — shown when "use shared" is unchecked #}
-                            <div x-show="overrideTextShown['{{ platform }}']">
+                            {# Override textarea — when "use shared" is unchecked #}
+                            <div x-show="overrideTextShown['{{ platform }}']" class="mb-1" @input.capture="overrideText['{{ platform }}'] = $event.target.value">
+                                {{ pf.override_text }}
+                                {% if pf.override_text.errors %}
+                                <p class="mt-1 text-xs text-red-600">{{ pf.override_text.errors.0 }}</p>
+                                {% endif %}
+                            </div>
 
-                                {# AI toolbar (reusable partial) #}
-                                {% include "social_media/_ai_editor_tools.html" %}
-
-                                {# Override textarea #}
-                                <div class="mb-3" @input.capture="overrideText['{{ platform }}'] = $event.target.value">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <label class="block text-sm font-medium text-zinc-700">Content</label>
-                                        <span class="text-xs text-zinc-400" x-text="charCount('{{ platform }}') + ' characters'"></span>
-                                    </div>
-                                    {{ pf.override_text }}
-                                    {% if pf.override_text.errors %}
-                                    <p class="mt-1 text-xs text-red-600">{{ pf.override_text.errors.0 }}</p>
-                                    {% endif %}
-                                </div>
-
-                                {# Freeform AI instruction #}
-                                <div class="mb-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                                    <div class="flex gap-2">
-                                        <input type="text" x-model="customInstruction"
-                                               class="input input-bordered input-sm flex-1"
-                                               placeholder="Tell AI what to do with the text"
-                                               @keydown.enter.prevent="aiCustomInstruction('replace')" />
-                                        <button type="button" @click="aiCustomInstruction('replace')" :disabled="aiProcessing || !customInstruction"
-                                                class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Replace</button>
-                                        <button type="button" @click="aiCustomInstruction('insert')" :disabled="aiProcessing || !customInstruction"
-                                                class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Insert</button>
-                                        <button type="button" @click="aiCustomInstruction('append')" :disabled="aiProcessing || !customInstruction"
-                                                class="btn btn-xs btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50">Append</button>
-                                    </div>
+                            {# Freeform AI instruction — only when override text is active #}
+                            <div x-show="overrideTextShown['{{ platform }}']" class="mb-5">
+                                <div class="flex gap-1">
+                                    <input type="text" x-model="customInstruction"
+                                           class="input input-bordered input-sm flex-1"
+                                           placeholder="Tell AI what to do with the text…"
+                                           @keydown.enter.prevent="aiCustomInstruction('replace')" />
+                                    <button type="button" @click="aiCustomInstruction('replace')" :disabled="aiProcessing || !customInstruction"
+                                            class="btn btn-sm btn-outline border-zinc-300 text-zinc-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 disabled:opacity-50 inline-flex items-center gap-1 whitespace-nowrap">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                        </svg>
+                                        Apply to text
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -387,52 +393,51 @@
                         {# ── IMAGES SECTION ── #}
                         <div class="mb-5">
 
-                            {# "Use shared images" toggle header #}
-                            <div class="mb-3 flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                                <p class="text-sm font-medium text-zinc-700">Images</p>
+                            {# Images label + use-shared toggle #}
+                            <div class="flex items-center justify-start gap-5 mb-3">
+                                <p class="block text-sm font-medium text-zinc-700">Images</p>
                                 <label class="flex cursor-pointer items-center gap-2" @change="onSharedMediaToggle('{{ platform }}', $event)">
                                     {{ pf.use_shared_media }}
                                     <span class="text-xs text-zinc-500">Use shared images</span>
                                 </label>
                             </div>
 
-                            {# Shared images view — shown when "use shared media" is checked #}
-                            <div x-show="!overrideMediaShown['{{ platform }}']">
-                                <div class="flex flex-wrap gap-2">
-                                    <template x-for="img in sharedImages" :key="img.imageId">
-                                        <div class="relative">
-                                            <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200 opacity-60"></preview-img>
-                                        </div>
-                                    </template>
-                                    <p x-show="sharedImages.length === 0" class="text-xs text-zinc-400 self-center">No shared images yet</p>
-                                </div>
+                            {# Thumbnail grid — shared images when "use shared" is checked #}
+                            <div class="flex flex-wrap gap-2 mb-3" x-show="!overrideMediaShown['{{ platform }}']">
+                                <template x-for="img in sharedImages" :key="img.imageId">
+                                    <div class="relative">
+                                        <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200 opacity-60"></preview-img>
+                                    </div>
+                                </template>
+                                <p x-show="sharedImages.length === 0" class="text-xs text-zinc-400 self-center">No shared images yet</p>
                             </div>
 
-                            {# Platform override images — shown when "use shared media" is unchecked #}
-                            <div x-show="overrideMediaShown['{{ platform }}']">
-                                <div class="flex flex-wrap gap-2 mb-3">
-                                    <template x-for="img in (platformImages['{{ platform }}'] || [])" :key="img.imageId">
-                                        <div class="relative group">
-                                            <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-img>
-                                            <button type="button"
-                                                    @click="removePlatformImage('{{ platform }}', img.imageId)"
-                                                    class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </template>
-                                    <p x-show="!(platformImages['{{ platform }}'] || []).length" class="text-xs text-zinc-400 self-center">No override images</p>
-                                </div>
-                                <button type="button" @click="openPicker('platform:{{ platform }}')"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500 hover:border-indigo-400 hover:text-indigo-600">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    Add images
-                                </button>
+                            {# Thumbnail grid — platform override images when "use shared" is unchecked #}
+                            <div class="flex flex-wrap gap-2 mb-3" x-show="overrideMediaShown['{{ platform }}']">
+                                <template x-for="img in (platformImages['{{ platform }}'] || [])" :key="img.imageId">
+                                    <div class="relative group">
+                                        <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-img>
+                                        <button type="button"
+                                                @click="removePlatformImage('{{ platform }}', img.imageId)"
+                                                class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <p x-show="!(platformImages['{{ platform }}'] || []).length" class="text-xs text-zinc-400 self-center">No override images</p>
                             </div>
+
+                            {# Add images button — only when override is active #}
+                            <button type="button" @click="openPicker('platform:{{ platform }}')"
+                                    x-show="overrideMediaShown['{{ platform }}']"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500 hover:border-indigo-400 hover:text-indigo-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Add images
+                            </button>
                         </div>
                     </div>
                     {% endwith %}
@@ -444,7 +449,7 @@
         </div>
 
         {# ── Right: Preview ── #}
-        <div class="w-80 shrink-0 overflow-y-auto bg-zinc-50 px-5 py-6" id="post-preview-sidebar" x-show="mode === 'editor'">
+        <div class="w-160 shrink-0 overflow-y-auto bg-zinc-50 px-5 py-6" id="post-preview-sidebar" x-show="mode === 'editor'">
 
             {# Schedule picker #}
             <div class="mb-6">

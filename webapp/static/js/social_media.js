@@ -44,6 +44,9 @@ document.addEventListener('alpine:init', () => {
     deletedShared: [],       // [{mediaId, imageId}] — existing records removed
     platformImages: {},      // {platform: [{mediaId, imageId, url}]}
 
+    // ── Dirty state ───────────────────────────────────────────────────────
+    isDirty: false,
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     init() {
@@ -120,6 +123,14 @@ document.addEventListener('alpine:init', () => {
         }));
       }
 
+      // Track dirty state on any form input/change
+      const postForm = document.getElementById('post-form');
+      if (postForm) {
+        this._dirtyHandler = () => { this.isDirty = true; };
+        postForm.addEventListener('input', this._dirtyHandler);
+        postForm.addEventListener('change', this._dirtyHandler);
+      }
+
       // Listen for image picker acceptance
       this._pickerHandler = (event) => {
         if (event.value) this.pickerAccepted(event.value);
@@ -134,6 +145,22 @@ document.addEventListener('alpine:init', () => {
 
     destroy() {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
+      const postForm = document.getElementById('post-form');
+      if (postForm && this._dirtyHandler) {
+        postForm.removeEventListener('input', this._dirtyHandler);
+        postForm.removeEventListener('change', this._dirtyHandler);
+      }
+    },
+
+    // ── Cancel with dirty check ───────────────────────────────────────────
+
+    confirmCancel() {
+      if (this.isDirty) {
+        if (!confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+          return;
+        }
+      }
+      up.layer.dismiss();
     },
 
     // ── Mode switching ────────────────────────────────────────────────────
@@ -312,11 +339,11 @@ document.addEventListener('alpine:init', () => {
     async generatePost() {
       if (this.generating) return;
       this.generating = true;
-      this.generationStep = 'Generating text…';
+      this.generationStep = 'Generating…';
       try {
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
 
-        this.generationStep = 'Generating text & image…';
+        this.generationStep = 'Generating your post...';
 
         // Collect all enabled platforms from hidden platform inputs
         const platforms = [];
@@ -361,6 +388,7 @@ document.addEventListener('alpine:init', () => {
 
         // Switch to editor mode
         this.mode = 'editor';
+        this.isDirty = true;
       } catch (e) {
         console.error('Failed to generate post:', e);
       } finally {
@@ -487,6 +515,7 @@ document.addEventListener('alpine:init', () => {
 
     removeSeedImage(imageId) {
       this.seedImages = this.seedImages.filter(i => i.imageId !== imageId);
+      this.isDirty = true;
     },
 
     // ── Image Picker (Unpoly modal) ───────────────────────────────────────
@@ -511,6 +540,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     pickerAccepted({ target, imageIds, urls }) {
+      this.isDirty = true;
       if (target === 'seed') {
         // Seed images: replace fully
         this.seedImages = imageIds.map(id => ({
@@ -570,6 +600,7 @@ document.addEventListener('alpine:init', () => {
       }
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, this.sharedImages.length - 1));
       this.syncSharedMediaFormset();
+      this.isDirty = true;
     },
 
     // ── Platform image removal ────────────────────────────────────────────
@@ -583,6 +614,7 @@ document.addEventListener('alpine:init', () => {
       };
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, newList.length - 1));
       this.syncPlatformMediaJson();
+      this.isDirty = true;
     },
 
     // ── Formset sync ──────────────────────────────────────────────────────

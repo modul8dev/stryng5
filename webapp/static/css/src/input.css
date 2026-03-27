@@ -9,3 +9,7 @@
 up-modal[size=large] up-modal-box {
   width: 1500px !important;
 }
+
+textarea {
+  field-sizing: content; /* used to be `form-sizing` but changed to this */
+}
