@@ -40,6 +40,7 @@ class SocialMediaPostForm(forms.ModelForm):
             'scheduled_at': forms.DateTimeInput(attrs={
                 'class': 'input input-bordered w-full',
                 'type': 'datetime-local',
+                'form': 'post-form',
             }, format='%Y-%m-%dT%H:%M'),
             'topic': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',

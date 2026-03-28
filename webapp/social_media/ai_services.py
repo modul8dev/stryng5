@@ -137,7 +137,10 @@ def generate_post_image(brand, topic, post_type, seed_images, user):
             model='gemini-3.1-flash-image-preview',
             contents=contents,
             config=types.GenerateContentConfig(
-                response_modalities=['Image'],
+                response_modalities=['IMAGE'],
+                image_config=types.ImageConfig(
+                    aspect_ratio="9:16"
+                )
             ),
         )
     finally:

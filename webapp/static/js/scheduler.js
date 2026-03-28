@@ -52,10 +52,10 @@ function schedulerApp() {
                     const title = arg.event.title;
 
                     const statusColors = {
-                        draft: 'bg-zinc-100 text-zinc-600',
-                        scheduled: 'bg-amber-100 text-amber-700',
-                        published: 'bg-emerald-100 text-emerald-700',
-                        failed: 'bg-red-100 text-red-700',
+                        draft: 'bg-zinc-200 text-zinc-600',
+                        scheduled: 'bg-amber-400 text-white',
+                        published: 'bg-blue-500 text-white',
+                        failed: 'bg-red-500 text-white',
                     };
 
                     const platformColors = {
@@ -72,25 +72,27 @@ function schedulerApp() {
                         instagram: 'Ig',
                     };
 
+                    var sc = statusColors[props.status] || 'bg-zinc-200 text-zinc-600';
+
                     let html = '<div class="scheduler-event-card">';
 
+                    // Header: status badge + time
+                    html += '<div class="scheduler-event-header">';
+                    html += '<span class="scheduler-event-status ' + sc + '">' + self.escapeHtml(props.status) + '</span>';
+                    if (timeText) {
+                        html += '<span class="scheduler-event-time">' + self.escapeHtml(timeText) + '</span>';
+                    }
+                    html += '</div>';
+
+                    // Full-width image
                     if (props.thumbnail) {
                         html += '<div class="scheduler-event-thumb">'
                             + '<img src="' + self.escapeHtml(props.thumbnail) + '" alt="">'
                             + '</div>';
                     }
 
+                    // Body: caption
                     html += '<div class="scheduler-event-body">';
-
-                    html += '<div class="scheduler-event-meta">';
-                    if (timeText) {
-                        html += '<span class="scheduler-event-time">' + self.escapeHtml(timeText) + '</span>';
-                    }
-                    var sc = statusColors[props.status] || '';
-                    html += '<span class="scheduler-event-status ' + sc + '">' + self.escapeHtml(props.status) + '</span>';
-                    html += '</div>';
-
-                    html += '<div class="scheduler-event-title">' + self.escapeHtml(title) + '</div>';
 
                     if (props.caption) {
                         html += '<div class="scheduler-event-caption">' + self.escapeHtml(props.caption) + '</div>';
@@ -116,7 +118,7 @@ function schedulerApp() {
                     var editUrl = info.event.extendedProps.editUrl;
                     up.layer.open({
                         url: editUrl,
-                        mode: 'cover',
+                        mode: 'modal',
                         size: 'large',
                         history: false,
                         dismissable: false,
