@@ -1,0 +1,106 @@
+<c-vars
+    field=""
+    label=""
+    actions=""
+    endpoint=""
+    custom_instruction=""
+    custom_placeholder="Tell AI what to do with the text…"
+    char_count=""
+    auto_hide="never"
+    hide_delay="150"
+    result_mode="replace"
+    platform=""
+    language=""
+/>
+{% if label %}
+<label for="{{ field.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">{{ label }}</label>
+{% endif %}
+
+<div
+    x-data="aiTextarea({
+        endpoint: '{{ endpoint }}',
+        actionsStr: '{{ actions }}',
+        showCustomInstruction: {% if custom_instruction %}true{% else %}false{% endif %},
+        customPlaceholder: '{{ custom_placeholder|escapejs }}',
+        showCharCount: {% if char_count %}true{% else %}false{% endif %},
+        autoHide: '{{ auto_hide }}',
+        hideDelay: {{ hide_delay }},
+        resultMode: '{{ result_mode }}',
+        platform: '{{ platform }}',
+        language: '{{ language }}'
+    })"
+    @focusin="handleFocusIn($event)"
+    @focusout="handleFocusOut($event)"
+>
+    {# ── Char count ── #}
+    <div x-show="showCharCount" class="flex items-center justify-between mb-1">
+        <span class="text-xs text-zinc-400" x-text="charCountLabel()"></span>
+    </div>
+
+    {# ── AI toolbar ── #}
+    <div x-show="showTools" class="mb-1">
+        <div class="flex flex-wrap gap-1">
+            <template x-for="action in actionsList" :key="action">
+                <button
+                    type="button"
+                    @mousedown.prevent
+                    @click="runAction(action)"
+                    :disabled="processing"
+                    class="btn btn-xs btn-soft btn-primary"
+                    x-text="actionLabel(action)"
+                ></button>
+            </template>
+            {# Spinner #}
+            <div x-show="processing" class="mt-2 flex items-center gap-2 text-xs text-indigo-600">
+                <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                AI is editing…
+            </div>
+        </div>
+
+
+        {# Inline error #}
+        <div x-show="error" class="mt-1 text-xs text-red-600" x-text="error"></div>
+    </div>
+
+    {# ── Django field (renders textarea/input preserving all existing attrs) ── #}
+    {{ field }}
+
+    {# ── Custom instruction ── #}
+    <div x-show="showTools && showCustomInstruction" class="mt-1">
+        <div class="flex gap-1">
+            <input
+                type="text"
+                x-model="instruction"
+                class="input input-bordered input-sm flex-1"
+                :placeholder="customPlaceholder"
+                @keydown.enter.prevent="runCustomInstruction()"
+            />
+            <button
+                type="button"
+                @mousedown.prevent
+                @click="runCustomInstruction()"
+                :disabled="processing || !instruction"
+                class="btn btn-sm btn-soft btn-primary"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                </svg>
+                Apply to text
+            </button>
+        </div>
+    </div>
+
+    {# ── Field errors ── #}
+    {% if field.errors %}
+    <p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>
+    {% endif %}
+
+    {# ── Help text ── #}
+    {% if field.help_text %}
+    <p class="mt-1 text-xs text-zinc-500">{{ field.help_text }}</p>
+    {% endif %}
+
+</div>

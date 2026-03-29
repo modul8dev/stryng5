@@ -6,6 +6,23 @@
 
 [x-cloak] { display: none !important; }
 
+/* ── AI textarea: glow pulse while processing ───────────────────── */
+.ai-field-processing {
+    /* Make the text color match the theme */
+    color: #6366f1 !important; 
+    
+    /* This makes the actual LETTERS glow */
+    text-shadow: 0 0 8px rgba(99, 102, 241, 0.6), 
+                 0 0 20px rgba(99, 102, 241, 0.3);
+                 
+    animation: text-pulsate 1.4s ease-in-out infinite;
+}
+
+@keyframes text-pulsate {
+    0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(99, 102, 241, 0.4); }
+    50% { opacity: 0.7; text-shadow: 0 0 15px rgba(99, 102, 241, 0.8); }
+}
+
 up-modal[size=large] up-modal-box {
   width: 1500px !important;
 }

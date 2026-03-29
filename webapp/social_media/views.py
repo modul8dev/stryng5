@@ -360,6 +360,10 @@ def ai_edit_text(request):
     text = data.get('text', '')
     platform = data.get('platform')
     instruction = data.get('instruction')
+    # language and field_name are accepted for forward-compatibility; not yet used server-side
+    _ = data.get('language')
+    _ = data.get('field_name')
+    _ = data.get('result_mode')
 
     if not action or not text:
         return JsonResponse({'error': 'action and text are required'}, status=400)

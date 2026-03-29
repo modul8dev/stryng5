@@ -40,6 +40,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Application definition
 
 INSTALLED_APPS = [
+    'django_cotton',
     'integrations',
     'brand',
     'social_media',
