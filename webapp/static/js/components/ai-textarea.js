@@ -28,6 +28,7 @@ document.addEventListener('alpine:init', () => {
         hideDelay: cfg.hideDelay ?? 150,
         resultMode: cfg.resultMode || 'replace',
         platform: cfg.platform || '',
+        systemPrompt: cfg.systemPrompt || '',
 
         // ── State ──────────────────────────────────────────────────────────
         fieldEl: null,
@@ -118,6 +119,7 @@ document.addEventListener('alpine:init', () => {
                         instruction: instruction || '',
                         result_mode: this.resultMode,
                         platform: this.platform || undefined,
+                        system_prompt: this.systemPrompt || undefined,
                         field_name: this.fieldEl?.name || '',
                     }),
                 });

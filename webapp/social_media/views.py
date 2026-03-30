@@ -360,6 +360,7 @@ def ai_edit_text(request):
     text = data.get('text', '')
     platform = data.get('platform')
     instruction = data.get('instruction')
+    system_prompt = data.get('system_prompt') or None
     # field_name and result_mode accepted for forward-compatibility; not yet used server-side
     _ = data.get('field_name')
     _ = data.get('result_mode')
@@ -368,7 +369,7 @@ def ai_edit_text(request):
         return JsonResponse({'error': 'action and text are required'}, status=400)
 
     try:
-        edited = edit_text(action, text, brand, platform=platform, instruction=instruction)
+        edited = edit_text(action, text, brand, platform=platform, instruction=instruction, system_prompt_key=system_prompt)
         return JsonResponse({'text': edited})
     except ValueError as e:
         return JsonResponse({'error': str(e)}, status=400)

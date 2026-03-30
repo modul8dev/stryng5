@@ -7,6 +7,7 @@
     hide_delay="150"
     result_mode="replace"
     platform=""
+    system_prompt=""
 />
 
 <div
@@ -19,7 +20,8 @@
         autoHide: {% if auto_hide %}true{% else %}false{% endif %},
         hideDelay: {{ hide_delay }},
         resultMode: '{{ result_mode }}',
-        platform: '{{ platform }}'
+        platform: '{{ platform }}',
+        systemPrompt: '{{ system_prompt }}'
     })"
     @focusin="handleFocusIn($event)"
     @focusout="handleFocusOut($event)"

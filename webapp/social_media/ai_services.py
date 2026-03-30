@@ -5,7 +5,7 @@ from enum import Enum
 from django.core.files.base import ContentFile
 
 from media_library.models import Image, ImageGroup
-from prompts.social_media_edit import SOCIAL_MEDIA_EDIT_ACTIONS, SOCIAL_MEDIA_EDIT_SYSTEM
+from prompts.social_media_edit import EDIT_ACTIONS, SOCIAL_MEDIA_EDIT_SYSTEM, SYSTEM_PROMPTS
 from prompts.social_media_generate import SOCIAL_MEDIA_GENERATE_PROMPT
 from prompts.social_media_topic import SOCIAL_MEDIA_TOPIC_PROMPT
 
@@ -183,11 +183,11 @@ def generate_post_image(brand, topic, post_type, seed_images, user):
     return image_obj
 
 
-def edit_text(action, text, brand, platform=None, instruction=None):
+def edit_text(action, text, brand, platform=None, instruction=None, system_prompt_key=None):
     """Apply an AI edit action to text."""
     ctx = _get_brand_context(brand)
 
-    action_template = SOCIAL_MEDIA_EDIT_ACTIONS.get(action)
+    action_template = EDIT_ACTIONS.get(action)
     if not action_template:
         raise ValueError(f'Unknown action: {action}')
 
@@ -196,7 +196,8 @@ def edit_text(action, text, brand, platform=None, instruction=None):
         platform=platform or '',
         instruction=instruction or '',
     )
-    system_prompt = SOCIAL_MEDIA_EDIT_SYSTEM.format(**ctx)
+    system_prompt_template = SYSTEM_PROMPTS.get(system_prompt_key) if system_prompt_key else None
+    system_prompt = (system_prompt_template or SOCIAL_MEDIA_EDIT_SYSTEM).format(**ctx)
 
     return _openai_chat(
         messages=[
