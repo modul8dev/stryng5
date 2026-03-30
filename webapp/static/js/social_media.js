@@ -146,7 +146,14 @@ document.addEventListener('alpine:init', () => {
 
       // Listen for image picker acceptance
       this._pickerHandler = (event) => {
-        if (event.value) this.pickerAccepted(event.value);
+        if (!event.value) return;
+        // Image editor result: {imageId, imageUrl}
+        if (event.value.imageId && event.value.imageUrl && !event.value.imageIds) {
+          this.addEditorResultToSeeds(event.value);
+          return;
+        }
+        // Image picker result: {target, imageIds, urls}
+        if (event.value.imageIds) this.pickerAccepted(event.value);
       };
       document.addEventListener('up:layer:accepted', this._pickerHandler);
 
@@ -437,6 +444,12 @@ document.addEventListener('alpine:init', () => {
 
     removeSeedImage(imageId) {
       this.seedImages = this.seedImages.filter(i => i.imageId !== imageId);
+      this.isDirty = true;
+    },
+
+    addEditorResultToSeeds({ imageId, imageUrl }) {
+      if (!imageId || this.seedImages.some(i => i.imageId === imageId)) return;
+      this.seedImages = [...this.seedImages, { imageId, url: imageUrl }];
       this.isDirty = true;
     },
 

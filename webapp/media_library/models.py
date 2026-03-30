@@ -6,6 +6,7 @@ class ImageGroup(models.Model):
     class GroupType(models.TextChoices):
         PRODUCT = 'product', 'Product'
         MANUAL = 'manual', 'Manual'
+        GENERATED = 'generated', 'Generated'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -29,6 +30,10 @@ class ImageGroup(models.Model):
 
 
 class Image(models.Model):
+    class ImageType(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        GENERATED = 'generated', 'Generated'
+
     image_group = models.ForeignKey(
         ImageGroup,
         on_delete=models.CASCADE,
@@ -36,6 +41,11 @@ class Image(models.Model):
     )
     image = models.ImageField(upload_to='media_library/images/%Y/%m/', blank=True, null=True)
     external_url = models.URLField(blank=True)
+    image_type = models.CharField(
+        max_length=20,
+        choices=ImageType.choices,
+        default=ImageType.MANUAL,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

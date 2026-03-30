@@ -25,7 +25,7 @@ media/
 db.sqlite3
 /media/
 /staticfiles/
-/webapp/static/css/src/output.css 
+webapp/static/css/src/output.css 
 
 # Node.js & package manager
 
@@ -45,3 +45,4 @@ yarn-error.log\*
 
 .DS\_Store
 Thumbs.db
+webapp/static/css/src/output.css

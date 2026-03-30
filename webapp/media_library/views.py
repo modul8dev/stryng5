@@ -7,10 +7,11 @@ import requests as http_requests
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import strip_tags
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .forms import ImageFormSet, ImageGroupForm
@@ -323,4 +324,84 @@ def image_picker(request):
         'create_url': reverse('media_library:image_group_create'),
         'edit_url_base': reverse('media_library:image_group_edit', kwargs={'pk': 0}),
         'picker_url': reverse('media_library:image_picker'),
+    })
+
+
+@login_required
+def image_editor_modal(request):
+    source_image = None
+    image_id = request.GET.get('image_id')
+    if image_id:
+        try:
+            img = Image.objects.select_related('image_group').get(
+                pk=int(image_id),
+                image_group__user=request.user,
+            )
+            source_image = {'id': img.id, 'url': img.url}
+        except (Image.DoesNotExist, ValueError):
+            pass
+    return render(request, 'media_library/image_editor_modal.html', {
+        'source_image_json': json.dumps(source_image) if source_image else 'null',
+        'picker_url': reverse('media_library:image_picker'),
+        'generate_url': reverse('media_library:image_editor_generate'),
+    })
+
+
+@login_required
+@require_POST
+def image_editor_generate(request):
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    prompt = body.get('prompt', '').strip()
+    if not prompt:
+        return JsonResponse({'error': 'Prompt is required.'}, status=400)
+
+    attachment_ids = body.get('attachment_ids', [])
+    group_id = body.get('group_id')
+
+    # Validate and load attached images
+    input_images = []
+    if attachment_ids:
+        input_images = list(
+            Image.objects.filter(pk__in=attachment_ids, image_group__user=request.user)
+        )
+
+    # Resolve or lazily create output group
+    output_group = None
+    if group_id:
+        try:
+            output_group = ImageGroup.objects.get(pk=int(group_id), user=request.user)
+        except (ImageGroup.DoesNotExist, ValueError):
+            pass
+    if output_group is None:
+        output_group = ImageGroup.objects.create(
+            user=request.user,
+            title='AI Generated Images',
+            type=ImageGroup.GroupType.GENERATED,
+        )
+
+    # Get brand for context injection
+    brand = getattr(request.user, 'brand', None)
+
+    from social_media.ai_services import generate_editor_image
+    try:
+        image_obj = generate_editor_image(
+            prompt=prompt,
+            input_images=input_images,
+            brand=brand,
+            user=request.user,
+            output_group=output_group,
+        )
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+
+    if image_obj is None:
+        return JsonResponse({'error': 'Image generation failed — no image returned.'}, status=500)
+
+    return JsonResponse({
+        'image': {'id': image_obj.id, 'url': image_obj.url},
+        'group_id': output_group.id,
     })
