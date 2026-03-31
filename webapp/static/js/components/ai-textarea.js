@@ -38,6 +38,8 @@ document.addEventListener('alpine:init', () => {
         showTools: !cfg.autoHide,
         hideTimer: null,
         actionsList: [],
+        undoStack: [],
+        redoStack: [],
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         init() {
@@ -82,6 +84,27 @@ document.addEventListener('alpine:init', () => {
 
         actionLabel(action) {
             return ACTION_LABELS[action] || action;
+        },
+
+        // ── History ───────────────────────────────────────────────────────────
+        canUndo() { return this.undoStack.length > 0; },
+        canRedo() { return this.redoStack.length > 0; },
+
+        saveToHistory(value) {
+            this.undoStack.push(value);
+            this.redoStack = [];
+        },
+
+        undo() {
+            if (!this.undoStack.length) return;
+            this.redoStack.push(this.getValue());
+            this.setValue(this.undoStack.pop());
+        },
+
+        redo() {
+            if (!this.redoStack.length) return;
+            this.undoStack.push(this.getValue());
+            this.setValue(this.redoStack.pop());
         },
 
         // ── Actions ────────────────────────────────────────────────────────
@@ -138,6 +161,7 @@ document.addEventListener('alpine:init', () => {
                     } else {
                         newValue = data.text;
                     }
+                    this.saveToHistory(text);
                     this.setValue(newValue);
                     this.instruction = '';
                     this.$dispatch('ai-success', { action, instruction, result: data.text });

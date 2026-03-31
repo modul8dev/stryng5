@@ -25,15 +25,16 @@
     })"
     @focusin="handleFocusIn($event)"
     @focusout="handleFocusOut($event)"
+    class="border border-base-300 rounded-xl overflow-hidden transition-colors focus-within:border-primary [&_textarea]:!border-0 [&_textarea]:!shadow-none [&_textarea]:!outline-none [&_textarea]:!ring-0 [&_input:not([type=button]):not([type=submit])]:!border-0 [&_input:not([type=button]):not([type=submit])]:!shadow-none [&_input:not([type=button]):not([type=submit])]:!outline-none [&_input:not([type=button]):not([type=submit])]:!ring-0"
 >
     {# ── Char count ── #}
-    <div x-show="showCharCount" class="flex items-center justify-between mb-1">
+    <div x-show="showCharCount" class="flex items-center justify-end px-3 pt-1">
         <span class="text-xs text-zinc-400" x-text="charCountLabel()"></span>
     </div>
 
     {# ── AI toolbar ── #}
-    <div x-show="showTools" class="mb-1">
-        <div class="flex flex-wrap gap-1">
+    <div x-show="showTools" class="px-2 pt-2 pb-1">
+        <div class="flex flex-wrap items-center gap-1">
             <template x-for="action in actionsList" :key="action">
                 <button
                     type="button"
@@ -44,16 +45,35 @@
                     x-text="actionLabel(action)"
                 ></button>
             </template>
-            {# Spinner #}
-            <div x-show="processing" class="mt-2 flex items-center gap-2 text-xs text-indigo-600">
-                <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                AI is editing…
+            <div class="flex-1"></div>
+            {# Undo / Redo #}
+            <div class="flex gap-0.5">
+                <button
+                    type="button"
+                    @mousedown.prevent
+                    @click="undo()"
+                    :disabled="!canUndo() || processing"
+                    class="btn btn-xs btn-ghost btn-square"
+                    title="Undo"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14L4 9m0 0l5-5M4 9h11a6 6 0 010 12h-1"/>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    @mousedown.prevent
+                    @click="redo()"
+                    :disabled="!canRedo() || processing"
+                    class="btn btn-xs btn-ghost btn-square"
+                    title="Redo"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 14l5-5m0 0l-5-5m5 5H9a6 6 0 000 12h1"/>
+                    </svg>
+                </button>
             </div>
         </div>
-
 
         {# Inline error #}
         <div x-show="error" class="mt-1 text-xs text-red-600" x-text="error"></div>
@@ -63,28 +83,26 @@
     {{ slot }}
 
     {# ── Custom instruction ── #}
-    <div x-show="showTools && showCustomInstruction" class="mt-1">
-        <div class="flex gap-1">
-            <input
-                type="text"
-                x-model="instruction"
-                class="input input-bordered input-sm flex-1"
-                :placeholder="customPlaceholder"
-                @keydown.enter.prevent="runCustomInstruction()"
-            />
-            <button
-                type="button"
-                @mousedown.prevent
-                @click="runCustomInstruction()"
-                :disabled="processing || !instruction"
-                class="btn btn-sm btn-soft btn-primary"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
-                </svg>
-                Apply to text
-            </button>
-        </div>
+    <div x-show="showTools && showCustomInstruction" class="border-t border-base-300 flex items-center gap-1 px-2 py-1.5">
+        <input
+            type="text"
+            x-model="instruction"
+            class="input input-sm flex-1 bg-transparent border-0 shadow-none outline-none focus:outline-none"
+            :placeholder="customPlaceholder"
+            @keydown.enter.prevent="runCustomInstruction()"
+        />
+        <button
+            type="button"
+            @mousedown.prevent
+            @click="runCustomInstruction()"
+            :disabled="processing || !instruction"
+            class="btn btn-circle btn-sm btn-primary"
+            title="Apply to text"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+        </button>
     </div>
 
 
