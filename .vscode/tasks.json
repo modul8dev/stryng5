@@ -9,20 +9,16 @@
         "cwd": "${workspaceFolder}"
       },
       "isBackground": true,
-      "problemMatcher": [
-        {
-          "owner": "custom",
-          "pattern": [
-            {
-              "regexp": "."
-            }
-          ],
-          "background": {
-            "activeOnStart": true,
-            "endsPattern": "Done in .*|Watching for changes.*"
-          }
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "."
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "."
         }
-      ],
+      },
       "runOptions": {
         "instanceLimit": 1
       },

@@ -207,10 +207,10 @@ SOCIALACCOUNT_PROVIDERS = {
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # ─── Stripe ──────────────────────────────────────────────────────────────────
-STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_51OEbyaJh6xSLoV7rrZnZlJugGPbctihnjdtpy0jmjSACiGvfcjDdqeCi5oXUFHFVlqVddSvoLsfmAdgcaPcsoNHU00o8vpkGwd')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
-STRIPE_PRICING_TABLE_ID = os.environ.get('STRIPE_PRICING_TABLE_ID', 'prctbl_1TEuBpJh6xSLoV7rANYYuov9')
+STRIPE_PRICING_TABLE_ID = os.environ.get('STRIPE_PRICING_TABLE_ID', '')
 
 # ─── Credits ─────────────────────────────────────────────────────────────────
 CREDITS_SIGNUP_GRANT = int(os.environ.get('CREDITS_SIGNUP_GRANT', '50'))
