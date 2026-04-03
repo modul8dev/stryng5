@@ -14,8 +14,18 @@ function campaignChat() {
         _stepId: 0,
 
         init() {
-            // Render markdown in server-rendered assistant messages
+            // Configure marked renderer to make images compact in chat bubbles
             if (window.marked) {
+                const renderer = new marked.Renderer();
+                const originalImage = renderer.image.bind(renderer);
+                renderer.image = function(token) {
+                    // originalImage returns an <img> string; we wrap it for sizing
+                    const base = originalImage(token);
+                    // inject inline style for small thumbnails
+                    return base.replace('<img ', '<preview-img style="max-height:120px;max-width:200px;border-radius:6px;display:inline-block;margin:2px;" ');
+                };
+                marked.use({ renderer });
+
                 document.querySelectorAll('.js-markdown').forEach(el => {
                     el.innerHTML = marked.parse(el.dataset.content || '');
                 });
@@ -200,13 +210,13 @@ function campaignChat() {
             const div = document.createElement('div');
             div.className = 'flex justify-start';
             div.innerHTML = `
-                <div class="flex gap-3 max-w-3xl">
+                <div class="flex gap-3 w-full">
                     <div class="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600">
                         <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
-                    <div class="rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm text-zinc-800 shadow-sm border border-zinc-100 prose prose-sm max-w-none">
+                    <div class="rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm text-zinc-800 shadow-sm border border-zinc-100 prose prose-sm max-w-none w-full">
                         ${this.formatMessage(text)}
                     </div>
                 </div>`;

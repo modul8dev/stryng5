@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 
+from django.conf import settings
 from pydantic import BaseModel
 from agents import function_tool, RunContextWrapper
 
@@ -23,6 +24,16 @@ class AgentContext:
     project_id: int
     brand_id: int | None
     conversation_id: int
+
+
+def _make_absolute_url(url: str) -> str:
+    """Convert a relative media URL to a full absolute URL using settings.SITE_URL."""
+    if not url:
+        return url
+    if url.startswith('http://') or url.startswith('https://'):
+        return url
+    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000').rstrip('/')
+    return f'{site_url}{url}'
 
 
 def _get_brand(ctx: RunContextWrapper[AgentContext]):
@@ -60,10 +71,50 @@ def get_enabled_platforms(ctx: RunContextWrapper[AgentContext]) -> str:
 
 
 @function_tool
+def describe_image(ctx: RunContextWrapper[AgentContext], image_id: int, image_url: str) -> str:
+    """Analyze the visual content of a single image using AI vision. Returns a description suitable for marketing use."""
+    from openai import OpenAI
+    client = OpenAI()
+    try:
+        response = client.chat.completions.create(
+            model='gpt-4o-mini',
+            messages=[
+                {
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'text',
+                            'text': (
+                                'Describe this image for social media marketing. Include: '
+                                'what products/subjects are shown, colors, mood, composition style, '
+                                'and how it could be used in a marketing campaign. Be concise (2-3 sentences).'
+                            ),
+                        },
+                        {
+                            'type': 'image_url',
+                            'image_url': {'url': image_url, 'detail': 'low'},
+                        },
+                    ],
+                }
+            ],
+            max_tokens=200,
+        )
+        description = response.choices[0].message.content or ''
+        return json.dumps({'image_id': image_id, 'url': image_url, 'description': description})
+    except Exception as e:
+        return json.dumps({
+            'image_id': image_id,
+            'url': image_url,
+            'description': f'Could not analyze image (may be internally hosted): {str(e)[:80]}',
+        })
+
+
+@function_tool
 def list_image_groups(ctx: RunContextWrapper[AgentContext]) -> str:
     """List available image groups in the media library with their image counts. Use this to understand what images are available before selecting."""
     groups = ImageGroup.objects.filter(
         project_id=ctx.context.project_id,
+        type=ImageGroup.GroupType.PRODUCT
     ).prefetch_related('images')
     result = []
     for group in groups[:20]:
@@ -75,7 +126,7 @@ def list_image_groups(ctx: RunContextWrapper[AgentContext]) -> str:
             'type': group.type,
             'image_count': group.images.count(),
             'images': [
-                {'id': img.id, 'url': img.url}
+                {'id': img.id, 'url': _make_absolute_url(img.url)}
                 for img in images
             ],
         })
@@ -84,7 +135,7 @@ def list_image_groups(ctx: RunContextWrapper[AgentContext]) -> str:
 
 @function_tool
 def search_images(ctx: RunContextWrapper[AgentContext], query: str) -> str:
-    """Search for images in the media library by group title or description. Returns matching images with their IDs and URLs."""
+    """Search for images in the media library by group title or description. Returns matching images with their IDs and absolute URLs."""
     from django.db.models import Q
     groups = ImageGroup.objects.filter(
         Q(title__icontains=query) | Q(description__icontains=query),
@@ -97,11 +148,69 @@ def search_images(ctx: RunContextWrapper[AgentContext], query: str) -> str:
                 'id': img.id,
                 'group_title': group.title,
                 'group_description': group.description or '',
-                'url': img.url,
+                'url': _make_absolute_url(img.url),
             })
     if not results:
         return json.dumps({'message': 'No images found matching your query.', 'results': []})
     return json.dumps(results)
+
+
+@function_tool
+def search_unsplash(ctx: RunContextWrapper[AgentContext], query: str, count: int = 5) -> str:
+    """Search Unsplash for free stock photos matching the query. Saves results to the media library as external references and returns image IDs and full URLs suitable for use as seed images."""
+    import requests as http_requests
+    from django.contrib.auth import get_user_model
+
+    access_key = getattr(settings, 'UNSPLASH_ACCESS_KEY', '')
+    if not access_key:
+        return json.dumps({'error': 'Unsplash API key not configured. Set UNSPLASH_ACCESS_KEY in environment.'})
+
+    try:
+        resp = http_requests.get(
+            'https://api.unsplash.com/search/photos',
+            params={'query': query, 'per_page': min(max(count, 1), 10), 'client_id': access_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return json.dumps({'error': f'Unsplash search failed: {str(e)[:120]}'})
+
+    items = data.get('results', [])
+    if not items:
+        return json.dumps({'message': 'No Unsplash results found for this query.', 'results': []})
+
+    User = get_user_model()
+    user = User.objects.get(pk=ctx.context.user_id)
+
+    group, _ = ImageGroup.objects.get_or_create(
+        project_id=ctx.context.project_id,
+        title='Unsplash References',
+        defaults={
+            'user': user,
+            'type': ImageGroup.GroupType.MANUAL,
+            'description': 'Images imported from Unsplash as campaign references and seed images.',
+        },
+    )
+
+    results = []
+    for item in items:
+        img_url = item['urls'].get('regular') or item['urls'].get('full', '')
+        if not img_url:
+            continue
+        img_obj, _ = Image.objects.get_or_create(
+            image_group=group,
+            external_url=img_url,
+            defaults={'image_type': Image.ImageType.MANUAL},
+        )
+        results.append({
+            'id': img_obj.id,
+            'url': img_url,
+            'description': item.get('description') or item.get('alt_description') or query,
+            'photographer': item.get('user', {}).get('name', ''),
+        })
+
+    return json.dumps({'results': results, 'source': 'unsplash'})
 
 
 @function_tool
@@ -147,7 +256,7 @@ def generate_image(
 
     return json.dumps({
         'id': image_obj.id,
-        'url': image_obj.url,
+        'url': _make_absolute_url(image_obj.url),
         'message': 'Image generated successfully.',
     })
 

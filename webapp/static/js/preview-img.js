@@ -8,7 +8,7 @@ class PreviewImg extends HTMLElement {
     }
 
     static get observedAttributes() {
-        return ["src", "alt", "class"];
+        return ["src", "alt", "class", "style"];
     }
 
     attributeChangedCallback() {
@@ -21,6 +21,7 @@ class PreviewImg extends HTMLElement {
         const src = this.getAttribute("src") || "";
         const alt = this.getAttribute("alt") || "";
         const cls = this.getAttribute("class") || "";
+        const style = this.getAttribute("style") || "";
 
         this.innerHTML = "";
 
@@ -29,6 +30,7 @@ class PreviewImg extends HTMLElement {
         img.alt = alt;
         img.className = `${cls} cursor-pointer`;
         img.loading = "lazy";
+        if (style) img.style.cssText = style;
 
         img.addEventListener("click", () => {
             PreviewImg.openPreview(src, alt);

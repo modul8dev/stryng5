@@ -217,6 +217,12 @@ STRIPE_PRICING_TABLE_ID = os.environ.get('STRIPE_PRICING_TABLE_ID', '')
 CREDITS_SIGNUP_GRANT = int(os.environ.get('CREDITS_SIGNUP_GRANT', '50'))
 CREDITS_SIGNUP_DAYS = int(os.environ.get('CREDITS_SIGNUP_DAYS', '30'))
 
+# ─── Site / Campaign agents ───────────────────────────────────────────────────
+# Public-facing base URL — used by agents to build absolute image URLs.
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+# Unsplash API access key — https://unsplash.com/developers
+UNSPLASH_ACCESS_KEY = os.environ.get('UNSPLASH_ACCESS_KEY', '')
+
 # ─── Authlib OAuth Clients (for integrations app) ──────────────────────
 AUTHLIB_OAUTH_CLIENTS = {
     'facebook': {
