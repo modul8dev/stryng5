@@ -250,15 +250,6 @@
                             </a>
                         </li>
                         <li>
-                            <a href="/campaigns/" up-follow
-                               class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 [&.menu-active]:bg-indigo-50 [&.menu-active]:text-indigo-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                                Campaigns
-                            </a>
-                        </li>
-                        <li>
                             <a href="/scheduler/" up-follow
                                class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 [&.menu-active]:bg-indigo-50 [&.menu-active]:text-indigo-700">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -342,7 +333,6 @@
     <script src="{% static 'js/scheduler.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
     <script>if (window.marked) { marked.use({ breaks: true, gfm: true }); }</script>
-    <script src="{% static 'js/campaigns.js' %}"></script>
     <script src="{% static 'js/preview-img.js' %}"></script>
     <script async src="https://js.stripe.com/v3/pricing-table.js"></script>
     {% block scripts %}{% endblock %}
