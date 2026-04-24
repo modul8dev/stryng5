@@ -78,6 +78,8 @@ class SocialMediaPostPlatform(models.Model):
     use_shared_text = models.BooleanField(default=True)
     override_text = models.TextField(blank=True)
     use_shared_media = models.BooleanField(default=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    publish_error = models.TextField(blank=True, default='')
 
     class Meta:
         unique_together = [('post', 'platform')]

@@ -26,12 +26,11 @@ from .models import (
     SocialMediaPostSeedImage,
     SocialMediaPlatformMedia,
 )
+from .publisher import publish_post
 
 
 def _accept_layer_response():
-    response = HttpResponse(status=204)
-    response['X-Up-Accept-Layer'] = 'null'
-    return response
+    return HttpResponse(status=204)
 
 
 def _build_image_groups_data(project):
@@ -386,3 +385,21 @@ def ai_edit_text(request):
     except Exception:
         logger.exception('Failed to edit text')
         return JsonResponse({'error': 'Failed to edit text'}, status=500)
+
+@login_required
+@require_POST
+def post_publish(request, pk):
+    """Publish an existing post to all connected, enabled platforms."""
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    results = publish_post(post, request.project, base_url=base_url)
+
+    successes = [p for p, r in results.items() if r['success']]
+    failures = {p: r['error'] for p, r in results.items() if not r['success']}
+
+    return JsonResponse({
+        'results': results,
+        'successes': successes,
+        'failures': failures,
+        'status': post.status,
+    })

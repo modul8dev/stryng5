@@ -1,5 +1,5 @@
 {% load social_media_tags %}
-<main id="post-composer" x-data="postComposer()">
+<main id="post-composer" x-data="postComposer()" {% if is_edit %}data-publish-url="{% url 'social_media:post_publish' post.pk %}"{% endif %}>
 <div class="flex flex-col h-full max-h-[90vh]">
 
     {# ── Sticky header ── #}
@@ -34,18 +34,70 @@
                     @click="confirmCancel()">
                 Cancel
             </button>
-            <button type="submit" form="post-form" name="action" value="draft"
-                    :disabled="generating"
+            <button type="button"
+                    @click="savePost(true, 'draft')"
+                    :disabled="generating || saving"
                     class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed">
                 Save Draft
             </button>
-            <button type="submit" form="post-form" name="action" value="schedule"
-                    :disabled="generating"
+            <button type="button"
+                    @click="savePost(true, 'schedule')"
+                    :disabled="generating || saving"
                     class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
                 Schedule
             </button>
+            {% if is_edit %}
+            <button type="button"
+                    @click="publishNow()"
+                    :disabled="generating || saving || publishing"
+                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                <template x-if="!publishing">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </template>
+                <template x-if="publishing">
+                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </template>
+                <span x-text="publishing ? 'Publishing…' : 'Publish Now'">Publish Now</span>
+            </button>
+            {% endif %}
         </div>
     </div>
+
+    {# ── Publish result banner ── #}
+    {% if is_edit %}
+    <div x-show="publishResult !== null" x-cloak class="px-6 py-3 border-b text-sm"
+         :class="publishResult && Object.keys(publishResult.failures || {}).length === 0
+                 ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                 : 'border-amber-200 bg-amber-50 text-amber-800'">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <template x-if="publishResult && publishResult.successes && publishResult.successes.length > 0">
+                    <p class="font-medium">
+                        Published to: <span x-text="publishResult.successes.join(', ')"></span>
+                    </p>
+                </template>
+                <template x-if="publishResult && publishResult.failures && Object.keys(publishResult.failures).length > 0">
+                    <div class="mt-1">
+                        <p class="font-medium">Failed platforms:</p>
+                        <template x-for="[platform, error] in Object.entries(publishResult.failures || {})" :key="platform">
+                            <p class="text-xs mt-0.5"><span x-text="platform" class="font-medium capitalize"></span>: <span x-text="error"></span></p>
+                        </template>
+                    </div>
+                </template>
+            </div>
+            <button type="button" @click="publishResult = null" class="shrink-0 text-current opacity-60 hover:opacity-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+    {% endif %}
 
     {# ── Generating overlay ── #}
     <div x-show="generating" x-cloak class="flex flex-1 flex-col items-center justify-center gap-6 bg-white my-20">
@@ -107,11 +159,11 @@
                         <p class="block text-sm font-medium text-zinc-700 mb-3">Seed Images</p>
                         <p class="text-xs text-zinc-400 mb-2">Select images to provide context for AI generation. These are NOT posted — they inspire the content.</p>
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <template x-for="img in seedImages" :key="img.imageId">
+                            <template x-for="img in seedImages" :key="img.mediaId">
                                 <div class="relative group">
                                     <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200" ></preview-img>
                                     <button type="button"
-                                            @click="removeSeedImage(img.imageId)"
+                                            @click="removeSeedImage(img.mediaId)"
                                             class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -305,11 +357,11 @@
 
                             {# Thumbnail grid #}
                             <div class="flex flex-wrap gap-2 mb-3" id="shared-media-thumbnails">
-                                <template x-for="img in sharedImages" :key="img.imageId">
+                                <template x-for="img in sharedImages" :key="img.mediaId">
                                     <div class="relative group">
                                         <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200" ></preview-img>
                                         <button type="button"
-                                                @click="removeSharedImage(img.imageId)"
+                                                @click="removeSharedImage(img.mediaId)"
                                                 class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -395,7 +447,7 @@
 
                             {# Thumbnail grid — shared images when "use shared" is checked #}
                             <div class="flex flex-wrap gap-2 mb-3" x-show="!overrideMediaShown['{{ platform }}']">
-                                <template x-for="img in sharedImages" :key="img.imageId">
+                                <template x-for="img in sharedImages" :key="img.mediaId">
                                     <div class="relative">
                                         <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200 opacity-60"></preview-img>
                                     </div>
@@ -405,11 +457,11 @@
 
                             {# Thumbnail grid — platform override images when "use shared" is unchecked #}
                             <div class="flex flex-wrap gap-2 mb-3" x-show="overrideMediaShown['{{ platform }}']">
-                                <template x-for="img in (platformImages['{{ platform }}'] || [])" :key="img.imageId">
+                                <template x-for="img in (platformImages['{{ platform }}'] || [])" :key="img.mediaId">
                                     <div class="relative group">
                                         <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-img>
                                         <button type="button"
-                                                @click="removePlatformImage('{{ platform }}', img.imageId)"
+                                                @click="removePlatformImage('{{ platform }}', img.mediaId)"
                                                 class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -490,7 +542,7 @@
                          @mouseenter="carouselHover = true" @mouseleave="carouselHover = false">
 
                         {# Slides #}
-                        <template x-for="(img, idx) in previewImages()" :key="img.imageId">
+                        <template x-for="(img, idx) in previewImages()" :key="img.mediaId">
                             <div x-show="carouselIndex === idx" class="absolute inset-0">
                                 <preview-img :src="img.url" class="w-full h-full object-cover"></preview-img>
                             </div>

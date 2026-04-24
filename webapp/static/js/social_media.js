@@ -26,7 +26,8 @@ document.addEventListener('alpine:init', () => {
     // ── AI state ──────────────────────────────────────────────────────────
     topic: '',
     postType: 'lifestyle',
-    seedImages: [],           // [{imageId, url}]
+    seedImages: [],           // [{mediaId, imageId, url}]
+    _tempIdCounter: 0,
     generating: false,
     generationStep: '',
     suggestingTopic: false,
@@ -48,6 +49,9 @@ document.addEventListener('alpine:init', () => {
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     init() {
+      // Read publish URL from data attribute (only present for existing posts)
+      this.publishUrl = this.$el.dataset.publishUrl || null;
+
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
 
@@ -116,6 +120,7 @@ document.addEventListener('alpine:init', () => {
       if (seedEl) {
         const data = JSON.parse(seedEl.textContent);
         this.seedImages = data.map(item => ({
+          mediaId: this._nextTempId(),
           imageId: item.image_id,
           url: item.url,
         }));
@@ -313,7 +318,7 @@ document.addEventListener('alpine:init', () => {
         // Seed platform images with shared images as starting point
         this.platformImages = {
           ...this.platformImages,
-          [platform]: this.sharedImages.map(img => ({ mediaId: null, imageId: img.imageId, url: img.url })),
+          [platform]: this.sharedImages.map(img => ({ mediaId: this._nextTempId(), imageId: img.imageId, url: img.url })),
         };
         this.syncPlatformMediaJson();
       }
@@ -400,7 +405,7 @@ document.addEventListener('alpine:init', () => {
         if (data.image) {
           this.sharedImages = [
             ...this.sharedImages,
-            { mediaId: null, imageId: data.image.id, url: data.image.url },
+            { mediaId: this._nextTempId(), imageId: data.image.id, url: data.image.url },
           ];
           this.syncSharedMediaFormset();
           this._resetCarousel();
@@ -440,16 +445,22 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    // ── Temp ID helper ────────────────────────────────────────────────────
+
+    _nextTempId() {
+      return --this._tempIdCounter;
+    },
+
     // ── Seed Image Management ─────────────────────────────────────────────
 
-    removeSeedImage(imageId) {
-      this.seedImages = this.seedImages.filter(i => i.imageId !== imageId);
+    removeSeedImage(mediaId) {
+      this.seedImages = this.seedImages.filter(i => i.mediaId !== mediaId);
       this.isDirty = true;
     },
 
     addEditorResultToSeeds({ imageId, imageUrl }) {
       if (!imageId || this.seedImages.some(i => i.imageId === imageId)) return;
-      this.seedImages = [...this.seedImages, { imageId, url: imageUrl }];
+      this.seedImages = [...this.seedImages, { mediaId: this._nextTempId(), imageId, url: imageUrl }];
       this.isDirty = true;
     },
 
@@ -479,6 +490,7 @@ document.addEventListener('alpine:init', () => {
       if (target === 'seed') {
         // Seed images: replace fully
         this.seedImages = imageIds.map(id => ({
+          mediaId: this._nextTempId(),
           imageId: id,
           url: urls[id],
         }));
@@ -492,7 +504,7 @@ document.addEventListener('alpine:init', () => {
       if (target === 'shared') {
         const newShared = this.sharedImages.filter(img => {
           if (!imageIds.includes(img.imageId)) {
-            if (img.mediaId) {
+            if (img.mediaId > 0) {
               this.deletedShared = [...this.deletedShared, { mediaId: img.mediaId, imageId: img.imageId }];
             }
             return false;
@@ -502,7 +514,7 @@ document.addEventListener('alpine:init', () => {
         const existingImageIds = this.sharedImages.map(i => i.imageId);
         imageIds.forEach(id => {
           if (!existingImageIds.includes(id)) {
-            newShared.push({ mediaId: null, imageId: id, url: urls[id] });
+            newShared.push({ mediaId: this._nextTempId(), imageId: id, url: urls[id] });
           }
         });
         this.sharedImages = newShared;
@@ -515,7 +527,7 @@ document.addEventListener('alpine:init', () => {
         const newList = existing.filter(img => imageIds.includes(img.imageId));
         imageIds.forEach(id => {
           if (!existingImageIds.includes(id)) {
-            newList.push({ mediaId: null, imageId: id, url: urls[id] });
+            newList.push({ mediaId: this._nextTempId(), imageId: id, url: urls[id] });
           }
         });
         this.platformImages = { ...this.platformImages, [platform]: newList };
@@ -525,12 +537,12 @@ document.addEventListener('alpine:init', () => {
 
     // ── Shared image removal ──────────────────────────────────────────────
 
-    removeSharedImage(imageId) {
-      const idx = this.sharedImages.findIndex(i => i.imageId === imageId);
+    removeSharedImage(mediaId) {
+      const idx = this.sharedImages.findIndex(i => i.mediaId === mediaId);
       if (idx === -1) return;
       const removed = this.sharedImages[idx];
       this.sharedImages = this.sharedImages.filter((_, i) => i !== idx);
-      if (removed.mediaId) {
+      if (removed.mediaId > 0) {
         this.deletedShared = [...this.deletedShared, { mediaId: removed.mediaId, imageId: removed.imageId }];
       }
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, this.sharedImages.length - 1));
@@ -540,9 +552,9 @@ document.addEventListener('alpine:init', () => {
 
     // ── Platform image removal ────────────────────────────────────────────
 
-    removePlatformImage(platform, imageId) {
+    removePlatformImage(platform, mediaId) {
       const list = this.platformImages[platform] || [];
-      const newList = list.filter(i => i.imageId !== imageId);
+      const newList = list.filter(i => i.mediaId !== mediaId);
       this.platformImages = {
         ...this.platformImages,
         [platform]: newList,
@@ -562,8 +574,8 @@ document.addEventListener('alpine:init', () => {
       const prefix = 'media';
       let formIdx = 0;
 
-      // Active existing images (have a mediaId)
-      const existingActive = this.sharedImages.filter(i => i.mediaId);
+      // Active existing images (have a real DB mediaId)
+      const existingActive = this.sharedImages.filter(i => i.mediaId > 0);
       existingActive.forEach(img => {
         this._appendInput(container, `${prefix}-${formIdx}-id`, img.mediaId);
         this._appendInput(container, `${prefix}-${formIdx}-image`, img.imageId);
@@ -582,8 +594,8 @@ document.addEventListener('alpine:init', () => {
 
       const initialCount = existingActive.length + this.deletedShared.length;
 
-      // New images (no mediaId yet)
-      const newImages = this.sharedImages.filter(i => !i.mediaId);
+      // New images (temp negative mediaId, not yet saved)
+      const newImages = this.sharedImages.filter(i => !(i.mediaId > 0));
       newImages.forEach(img => {
         this._appendInput(container, `${prefix}-${formIdx}-image`, img.imageId);
         this._appendInput(container, `${prefix}-${formIdx}-sort_order`, formIdx);
@@ -613,5 +625,71 @@ document.addEventListener('alpine:init', () => {
       el.value = value;
       container.appendChild(el);
     },
+
+    // ── Save & Publish state ──────────────────────────────────────────────
+
+    saving: false,
+    publishing: false,
+    publishResult: null,   // null | { successes: [], failures: {} }
+    publishUrl: null,
+
+    // ── Save post ─────────────────────────────────────────────────────────
+
+    async savePost(closeOnSuccess = true, action = 'draft') {
+      const form = document.getElementById('post-form');
+      if (!form) return;
+
+      this.saving = true;
+      try {
+        this.syncSharedMediaFormset();
+        this.syncPlatformMediaJson();
+
+        await up.submit(form, { params: { action }, layer: 'current', target: ':none' });
+
+        if (closeOnSuccess) {
+          up.layer.accept();
+        }
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    // ── Publish Now ───────────────────────────────────────────────────────
+
+    async publishNow() {
+      if (this.publishing || !this.publishUrl) return;
+      this.publishing = true;
+      this.publishResult = null;
+
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+          || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+        // Step 1: Save current form state (keep modal open)
+        await this.savePost(false);
+
+        // Step 2: Publish to connected platforms
+        const resp = await fetch(this.publishUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+        });
+        const data = await resp.json();
+        this.publishResult = data;
+
+        // Notify the post list to reload
+        up.emit('social_media:changed');
+
+        // Close the modal after a short delay when all platforms succeeded
+        if (data.successes && data.successes.length > 0 && Object.keys(data.failures || {}).length === 0) {
+          setTimeout(() => up.layer.accept(), 1200);
+        }
+      } catch (e) {
+        console.error('Failed to publish:', e);
+        this.publishResult = { successes: [], failures: { general: e.message } };
+      } finally {
+        this.publishing = false;
+      }
+    },
+
   }));
 });
