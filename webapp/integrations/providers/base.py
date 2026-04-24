@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from django.urls import reverse
+
 
 class BaseProvider(ABC):
     """Abstract base class for all integration providers."""
@@ -29,9 +31,10 @@ class BaseProvider(ABC):
         """Whether the provider needs a page/account selection step after OAuth."""
         return False
 
-    @abstractmethod
     def get_callback_url(self, request):
         """Build the absolute callback URL for this provider."""
+        path = reverse('integrations:integration_callback', kwargs={'provider': self.key})
+        return request.build_absolute_uri(path)
 
     @abstractmethod
     def handle_callback(self, request):

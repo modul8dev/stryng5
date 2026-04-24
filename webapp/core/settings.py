@@ -36,6 +36,15 @@ CSRF_TRUSTED_ORIGINS = ['https://*.stryng.io', 'http://localhost:8000', 'http://
 # so Django and allauth build https:// callback URLs correctly.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# ─── ngrok (local development only) ──────────────────────────────────────────
+# Set NGROK_URL in .env (e.g. https://abc123.ngrok-free.app) to tunnel OAuth
+# callbacks to localhost. Has no effect when the variable is absent (production).
+NGROK_URL = os.environ.get('NGROK_URL', '').rstrip('/')
+if NGROK_URL:
+    CSRF_TRUSTED_ORIGINS.append(NGROK_URL)
+    # Trust X-Forwarded-Host so request.build_absolute_uri() returns the ngrok URL.
+    USE_X_FORWARDED_HOST = True
+
 
 # Application definition
 

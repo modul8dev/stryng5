@@ -1,5 +1,4 @@
 import requests as http_requests
-from django.urls import reverse
 
 from ..models import IntegrationConnection
 from ..oauth import oauth
@@ -41,11 +40,6 @@ class InstagramProvider(BaseProvider):
 
     # Direct Instagram login — single account per auth, no selection step needed.
     has_account_selection = False
-
-    def get_callback_url(self, request):
-        return request.build_absolute_uri(
-            reverse('integrations:integration_callback', kwargs={'provider': self.key})
-        )
 
     def handle_callback(self, request):
         token = oauth.instagram.authorize_access_token(request)
