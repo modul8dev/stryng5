@@ -1,0 +1,213 @@
+<main x-data="publishPanel()"
+      data-post-id="{{ post.pk }}"
+      data-post-status="{{ post.status }}"
+      data-scheduled-at="{{ post.scheduled_at|date:'c'|default:'' }}"
+      data-publish-url="{% url 'social_media:post_publish' post.pk %}"
+      data-schedule-url="{% url 'social_media:post_schedule' post.pk %}"
+      data-unschedule-url="{% url 'social_media:post_unschedule' post.pk %}">
+  {% csrf_token %}
+  <div class="w-full">
+
+    {# ── Header ── #}
+    <div class="flex items-center justify-between px-5 pt-5 pb-4 border-b border-zinc-100">
+      <h3 class="text-sm font-semibold text-zinc-800">Publish Post</h3>
+    </div>
+
+    {# ── Publishing: spinner ── #}
+    <div x-show="view === 'publishing'" class="flex flex-col items-center gap-4 py-14 px-5">
+      <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <div class="text-center">
+        <p class="text-sm font-semibold text-zinc-800">Publishing to platforms…</p>
+        <p class="mt-1 text-xs text-zinc-400">Please wait, this may take a moment.</p>
+      </div>
+    </div>
+
+    {# ── Results: after publish ── #}
+    <div x-show="view === 'results'" class="px-5 py-5 space-y-4">
+
+      {# Status summary #}
+      <div :class="{
+            'bg-emerald-50 border-emerald-200 text-emerald-800': postStatus === 'published',
+            'bg-red-50 border-red-200 text-red-800': postStatus === 'failed',
+            'bg-zinc-50 border-zinc-200 text-zinc-700': postStatus !== 'published' && postStatus !== 'failed'
+           }"
+           class="rounded-lg border px-4 py-3 flex items-center gap-2.5">
+        <template x-if="postStatus === 'published'">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </template>
+        <template x-if="postStatus === 'failed'">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </template>
+        <p class="text-sm font-medium"
+           x-text="postStatus === 'published' ? 'Published successfully' : postStatus === 'failed' ? 'Some platforms failed' : 'Publish complete'">
+        </p>
+      </div>
+
+      {# Platform results — from SSE (dynamic) #}
+      <template x-if="liveResults.length > 0">
+        <ul class="space-y-2">
+          <template x-for="r in liveResults" :key="r.platform">
+            <li :class="r.success ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'"
+                class="rounded-lg border px-3 py-2.5">
+              <div class="flex items-start justify-between gap-3">
+                <span class="text-sm font-medium text-zinc-800 capitalize" x-text="r.platform"></span>
+                <span :class="r.success ? 'text-emerald-700' : 'text-red-600'"
+                      class="text-xs whitespace-nowrap"
+                      x-text="r.success ? '✓ Published' : '✗ Failed'"></span>
+              </div>
+              <template x-if="!r.success && r.error">
+                <p class="mt-1 text-xs text-red-600 leading-snug" x-text="r.error"></p>
+              </template>
+            </li>
+          </template>
+        </ul>
+      </template>
+
+      {# Platform results — from server (initial load for already-published/failed) #}
+      <template x-if="liveResults.length === 0">
+        <ul class="space-y-2">
+          {% for pv in platforms %}
+          <li class="rounded-lg border px-3 py-2.5
+              {% if pv.published_at %}border-emerald-200 bg-emerald-50{% elif pv.publish_error %}border-red-200 bg-red-50{% else %}border-zinc-200 bg-white{% endif %}">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-sm font-medium text-zinc-800">{{ pv.get_platform_display }}</span>
+              {% if pv.published_at %}
+              <span class="text-xs text-emerald-700 whitespace-nowrap">✓ {{ pv.published_at|date:"M j, g:i A" }}</span>
+              {% elif pv.publish_error %}
+              <span class="text-xs text-red-600 whitespace-nowrap">✗ Failed</span>
+              {% else %}
+              <span class="text-xs text-zinc-400">Not published</span>
+              {% endif %}
+            </div>
+            {% if pv.publish_error %}
+            <p class="mt-1 text-xs text-red-600 leading-snug">{{ pv.publish_error }}</p>
+            {% endif %}
+            {% if pv.published_url %}
+            <a href="{{ pv.published_url }}"
+               target="_blank" rel="noopener noreferrer"
+               class="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline">
+              View post
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </template>
+
+      <button type="button"
+              @click="up.layer.dismiss()"
+              class="inline-flex w-full items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+        Close
+      </button>
+    </div>
+
+    {# ── Options: schedule / publish ── #}
+    <div x-show="view === 'options'" class="px-5 py-5 space-y-4">
+
+      {# Schedule datetime #}
+      <div>
+        <label class="mb-1.5 block text-sm font-medium text-zinc-700">Schedule date &amp; time</label>
+        <input type="datetime-local"
+               x-model="scheduledAt"
+               :min="minDatetime()"
+               class="input input-bordered w-full" />
+        <p x-show="scheduleError"
+           x-text="scheduleError"
+           x-cloak
+           class="mt-1 text-xs text-red-600"></p>
+      </div>
+
+      {# Action buttons #}
+      <div class="flex flex-col gap-2">
+
+        {# Schedule — when not already scheduled #}
+        <template x-if="postStatus !== 'scheduled'">
+          <button type="button"
+                  @click="schedulePost()"
+                  :disabled="scheduling"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
+            <template x-if="scheduling">
+              <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+            </template>
+            <template x-if="!scheduling">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </template>
+            <span x-text="scheduling ? 'Scheduling…' : 'Schedule'">Schedule</span>
+          </button>
+        </template>
+
+        {# Unschedule — when already scheduled #}
+        <template x-if="postStatus === 'scheduled'">
+          <button type="button"
+                  @click="unschedulePost()"
+                  :disabled="unscheduling"
+                  class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed">
+            <template x-if="unscheduling">
+              <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+            </template>
+            <template x-if="!unscheduling">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </template>
+            <span x-text="unscheduling ? 'Unscheduling…' : 'Unschedule'">Unschedule</span>
+          </button>
+        </template>
+
+        {# Publish Now #}
+        <button type="button"
+                @click="publishNow()"
+                :disabled="publishing"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed">
+          <template x-if="publishing">
+            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </template>
+          <template x-if="!publishing">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </template>
+          <span x-text="publishing ? 'Queuing…' : 'Publish Now'">Publish Now</span>
+        </button>
+      </div>
+
+      {# Current status footer #}
+      <div class="pt-3 border-t border-zinc-100 text-xs text-zinc-500">
+        Status:
+        <span :class="{
+                'text-zinc-700': postStatus === 'draft',
+                'text-indigo-600 font-medium': postStatus === 'scheduled',
+                'text-amber-600 font-medium': postStatus === 'publishing',
+                'text-emerald-600 font-medium': postStatus === 'published',
+                'text-red-600 font-medium': postStatus === 'failed',
+              }"
+              x-text="statusLabel()"></span>
+        <template x-if="postStatus === 'scheduled' && scheduledAt">
+          <span x-text="' · ' + formatScheduledAt(scheduledAt)"></span>
+        </template>
+      </div>
+    </div>
+
+  </div>
+</main>

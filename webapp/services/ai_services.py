@@ -104,22 +104,29 @@ def suggest_topic(brand, seed_images):
 def _generate_gemini_image(prompt, input_images=None):
     """Call Gemini image generation and return (image_data, mime_type) or None."""
     from io import BytesIO
-    import urllib.request
+    import requests
     from PIL import Image as PILImage
     from google.genai import types
+
+    _browser_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
 
     client = _get_gemini_client()
     pil_images = []
     try:
         for img in (input_images or []):
-            try:
-                if img.image and img.image.name:
-                    pil_images.append(PILImage.open(img.image.path))
-                elif img.external_url:
-                    with urllib.request.urlopen(img.external_url) as resp:  # noqa: S310
-                        pil_images.append(PILImage.open(BytesIO(resp.read())))
-            except Exception:
-                pass
+            if img.image and img.image.name:
+                pil_images.append(PILImage.open(img.image.path))
+            elif img.external_url:
+                try:
+                    resp = requests.get(img.external_url, headers=_browser_headers, timeout=15)
+                    resp.raise_for_status()
+                    pil_images.append(PILImage.open(BytesIO(resp.content)))
+                except requests.RequestException as exc:
+                    raise RuntimeError(f'Failed to fetch image from {img.external_url}: {exc}') from exc
 
         contents = [prompt] + pil_images
 

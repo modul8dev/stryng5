@@ -2,20 +2,22 @@
 <main id="post-composer" x-data="postComposer()"
       {% if is_edit %}
       data-publish-url="{% url 'social_media:post_publish' post.pk %}"
+      data-publish-panel-url="{% url 'social_media:post_publish_panel' post.pk %}"
       data-post-id="{{ post.pk }}"
       data-post-status="{{ post.status }}"
+      data-scheduled-at="{{ post.scheduled_at|date:'c'|default:'' }}"
       data-unschedule-url="{% url 'social_media:post_unschedule' post.pk %}"
       {% endif %}>
 <div class="flex flex-col h-full max-h-[90vh]">
 
     {# ── Sticky header ── #}
-    <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-6 py-4">
-        <div class="flex items-center gap-4">
-            <h2 class="text-lg font-semibold text-zinc-900">
+    <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-white px-4 sm:px-6 py-3 sm:py-4">
+        <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+            <h2 class="hidden sm:block text-lg font-semibold text-zinc-900">
                 {% if is_edit %}Edit Post{% else %}New Post{% endif %}
             </h2>
             {% if is_edit %}
-            <span x-text="statusLabel()"
+            <span x-text="statusBadgeLabel()"
                   :class="{
                     'bg-zinc-100 text-zinc-600': postStatus === 'draft',
                     'bg-indigo-100 text-indigo-700': postStatus === 'scheduled',
@@ -45,89 +47,31 @@
                 </button>
             </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <button type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="inline-flex items-center rounded-lg border border-zinc-200 bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                     @click="confirmCancel()">
-                Cancel
+                Close
             </button>
             <button type="button"
                     @click="savePost(true, 'draft')"
                     :disabled="generating || saving"
-                    class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                Save Draft
+                    class="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                Save
             </button>
-            <template x-if="postStatus !== 'scheduled'">
-            <button type="button"
-                    @click="savePost(true, 'schedule')"
-                    :disabled="generating || saving"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                Schedule
-            </button>
-            </template>
-            <template x-if="postStatus === 'scheduled'">
-            <button type="button"
-                    @click="unschedulePost()"
-                    class="inline-flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                Unschedule
-            </button>
-            </template>
             {% if is_edit %}
-            <button type="button"
-                    @click="publishNow()"
-                    :disabled="generating || saving || publishing"
-                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed">
-                <template x-if="!publishing">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                </template>
-                <template x-if="publishing">
-                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                </template>
-                <span x-text="publishing ? 'Queuing…' : 'Publish Now'">Publish Now</span>
-            </button>
-            {% if post.status == 'published' or post.status == 'failed' or post.status == 'publishing' %}
-            <a href="{% url 'social_media:post_publish_info' post.pk %}"
-               up-follow
-               up-mode="modal"
+            <a href="{% url 'social_media:post_publish_panel' post.pk %}"
                up-layer="new"
+               up-mode="modal"
+               up-size="small"
+               up-cache="false"
                up-history="false"
-               class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                Publish Info
+               class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-500">
+                Publish
             </a>
             {% endif %}
-            {% endif %}
         </div>
     </div>
-
-    {# ── Publish failure banner (only shown when SSE reports failures) ── #}
-    {% if is_edit %}
-    <div x-show="publishResult !== null" x-cloak class="px-6 py-3 border-b border-amber-200 bg-amber-50 text-amber-800 text-sm">
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <p class="font-medium">Some platforms failed to publish:</p>
-                <template x-for="[platform, error] in Object.entries(publishResult?.failures || {})" :key="platform">
-                    <p class="text-xs mt-0.5"><span x-text="platform" class="font-medium capitalize"></span>: <span x-text="error"></span></p>
-                </template>
-            </div>
-            <button type="button" @click="publishResult = null" class="shrink-0 text-current opacity-60 hover:opacity-100">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-    </div>
-    {% endif %}
 
     {# ── Generating overlay ── #}
     <div x-show="generating" x-cloak class="flex flex-1 flex-col items-center justify-center gap-6 bg-white my-20">
@@ -189,8 +133,14 @@
                         <p class="block text-sm font-medium text-zinc-700 mb-3">Seed Images</p>
                         <p class="text-xs text-zinc-400 mb-2">Select images to provide context for AI generation. These are NOT posted — they inspire the content.</p>
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <template x-for="img in seedImages" :key="img.mediaId">
-                                <div class="relative group">
+                            <template x-for="(img, idx) in seedImages" :key="img.mediaId">
+                                <div class="relative group cursor-grab active:cursor-grabbing"
+                                     draggable="true"
+                                     @dragstart="dragStart($event, idx, 'seed')"
+                                     @dragover.prevent="dragOver($event, idx, 'seed')"
+                                     @drop.prevent="drop($event, idx, 'seed')"
+                                     @dragend="dragEnd()"
+                                     :class="isDragOver(idx, 'seed') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                     <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200" ></preview-img>
                                     <button type="button"
                                             @click="removeSeedImage(img.mediaId)"
@@ -305,32 +255,23 @@
                 {# ═══════════════════════════════════════════════════════════ #}
                 <div x-show="mode === 'editor'" x-cloak>
 
-                    {# Title #}
-                    <div class="px-6 pt-6 mb-5">
-                        <label for="{{ form.title.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Title</label>
-                        {{ form.title }}
-                        {% if form.title.errors %}
-                        <p class="mt-1 text-xs text-red-600">{{ form.title.errors.0 }}</p>
-                        {% endif %}
-                    </div>
-
                     {# Tab bar #}
                     {% if enabled_platforms %}
                     <div class="border-b border-zinc-200 px-6 pt-2">
                         <nav class="flex gap-1 -mb-px" id="platform-tabs">
                             <button type="button"
-                                    class="tab-btn px-4 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-1.5"
+                                    class="tab-btn px-3 sm:px-4 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-1.5"
                                     :class="activeTab === 'all' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
                                     @click="activateTab('all')"
                                     data-tab="all">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
                                 </svg>
-                                All Platforms
+                                <span class="hidden sm:inline">All Platforms</span>
                             </button>
                             {% for platform in enabled_platforms %}
                             <button type="button"
-                                    class="tab-btn px-4 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-1.5"
+                                    class="tab-btn px-3 sm:px-4 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-1.5"
                                     :class="activeTab === '{{ platform }}' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300'"
                                     @click="activateTab('{{ platform }}')"
                                     data-tab="{{ platform }}">
@@ -351,7 +292,7 @@
                                     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
                                 </svg>
                                 {% endif %}
-                                {{ platform_labels|get_item:platform }}
+                                <span class="hidden sm:inline">{{ platform_labels|get_item:platform }}</span>
                             </button>
                             {% endfor %}
                         </nav>
@@ -367,8 +308,7 @@
                         <c-ai_textarea
                             actions="rewrite,improve,shorten,expand,make_engaging,adapt_to_platform,add_cta,fix_grammar"
                             custom_instruction=True
-                            char_count=True
-                            auto-hide=False
+                            auto-hide=True
                             result_mode="replace"
                         >
                             <div @input="sharedText = $event.target.value">
@@ -387,8 +327,14 @@
 
                             {# Thumbnail grid #}
                             <div class="flex flex-wrap gap-2 mb-3" id="shared-media-thumbnails">
-                                <template x-for="img in sharedImages" :key="img.mediaId">
-                                    <div class="relative group">
+                                <template x-for="(img, idx) in sharedImages" :key="img.mediaId">
+                                    <div class="relative group cursor-grab active:cursor-grabbing"
+                                         draggable="true"
+                                         @dragstart="dragStart($event, idx, 'shared')"
+                                         @dragover.prevent="dragOver($event, idx, 'shared')"
+                                         @drop.prevent="drop($event, idx, 'shared')"
+                                         @dragend="dragEnd()"
+                                         :class="isDragOver(idx, 'shared') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                         <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200" ></preview-img>
                                         <button type="button"
                                                 @click="removeSharedImage(img.mediaId)"
@@ -487,8 +433,14 @@
 
                             {# Thumbnail grid — platform override images when "use shared" is unchecked #}
                             <div class="flex flex-wrap gap-2 mb-3" x-show="overrideMediaShown['{{ platform }}']">
-                                <template x-for="img in (platformImages['{{ platform }}'] || [])" :key="img.mediaId">
-                                    <div class="relative group">
+                                <template x-for="(img, idx) in (platformImages['{{ platform }}'] || [])" :key="img.mediaId">
+                                    <div class="relative group cursor-grab active:cursor-grabbing"
+                                         draggable="true"
+                                         @dragstart="dragStart($event, idx, 'platform', '{{ platform }}')"
+                                         @dragover.prevent="dragOver($event, idx, 'platform', '{{ platform }}')"
+                                         @drop.prevent="drop($event, idx, 'platform', '{{ platform }}')"
+                                         @dragend="dragEnd()"
+                                         :class="isDragOver(idx, 'platform', '{{ platform }}') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                         <preview-img :src="img.url" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-img>
                                         <button type="button"
                                                 @click="removePlatformImage('{{ platform }}', img.mediaId)"
@@ -522,18 +474,7 @@
         </div>
 
         {# ── Right: Preview ── #}
-        <div class="w-160 shrink-0 overflow-y-auto bg-zinc-50 px-5 py-6" id="post-preview-sidebar" x-show="mode === 'editor'">
-
-            {# Schedule picker #}
-            <div class="mb-6">
-                <label for="{{ form.scheduled_at.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">
-                    Schedule date & time
-                </label>
-                {{ form.scheduled_at }}
-                {% if form.scheduled_at.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ form.scheduled_at.errors.0 }}</p>
-                {% endif %}
-            </div>
+        <div class="hidden md:flex md:flex-col md:w-80 lg:w-96 shrink-0 overflow-y-auto bg-zinc-50 px-5 py-6" id="post-preview-sidebar" x-show="mode === 'editor'">
 
             {# Live preview card #}
             <div>

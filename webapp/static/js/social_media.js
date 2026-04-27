@@ -47,7 +47,8 @@ document.addEventListener('alpine:init', () => {
     isDirty: false,
 
     // ── Publish / status state ────────────────────────────────────────────
-    postStatus: '',       // mirrors server-side post.status, updated via SSE
+    postStatus: '',       // mirrors server-side post.status
+    scheduledAt: '',      // ISO string of scheduled_at, empty when not scheduled
     postId: null,
     unscheduleUrl: null,
 
@@ -56,19 +57,19 @@ document.addEventListener('alpine:init', () => {
     init() {
       // Read publish URL from data attribute (only present for existing posts)
       this.publishUrl = this.$el.dataset.publishUrl || null;
+      this.publishPanelUrl = this.$el.dataset.publishPanelUrl || null;
       this.postId = this.$el.dataset.postId || null;
       this.postStatus = this.$el.dataset.postStatus || '';
+      this.scheduledAt = this.$el.dataset.scheduledAt || '';
       this.unscheduleUrl = this.$el.dataset.unscheduleUrl || null;
 
-      // If the post was already publishing when the editor opened, start spinner + SSE
-      if (this.postStatus === 'publishing' && this.postId && window.PostPublishEvents) {
-        this.publishing = true;
-        window.PostPublishEvents.subscribe(
-          this.postId,
-          (data) => this._onPublishDone(data),
-          () => { this.publishing = false; },
-        );
-      }
+      // Listen for status changes emitted by the publish panel
+      this._statusChangedHandler = (event) => {
+        this.postStatus = event.status || '';
+        this.scheduledAt = event.scheduledAt || '';
+        up.emit('social_media:changed');
+      };
+      document.addEventListener('social_media:status_changed', this._statusChangedHandler);
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
 
@@ -187,6 +188,7 @@ document.addEventListener('alpine:init', () => {
 
     destroy() {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
+      document.removeEventListener('social_media:status_changed', this._statusChangedHandler);
       const postForm = document.getElementById('post-form');
       if (postForm && this._dirtyHandler) {
         postForm.removeEventListener('input', this._dirtyHandler);
@@ -643,12 +645,18 @@ document.addEventListener('alpine:init', () => {
       container.appendChild(el);
     },
 
-    // ── Save & Publish state ──────────────────────────────────────────────
+    // ── Save state ────────────────────────────────────────────────────────
 
     saving: false,
-    publishing: false,
-    publishResult: null,   // null | { successes: [], failures: {} } — only for failures
     publishUrl: null,
+    publishPanelUrl: null,
+
+    // ── Drag-and-drop state ───────────────────────────────────────────────
+    dragSourceIndex: null,
+    dragSourceType: null,
+    dragSourcePlatform: null,
+    dragOverIndex: null,
+    dragOverType: null,
 
     // Returns human-readable label for current postStatus
     statusLabel() {
@@ -660,6 +668,14 @@ document.addEventListener('alpine:init', () => {
         failed: 'Failed',
       };
       return map[this.postStatus] || this.postStatus;
+    },
+
+    // Returns badge label including scheduled date when applicable
+    statusBadgeLabel() {
+      if (this.postStatus === 'scheduled' && this.scheduledAt) {
+        return 'Scheduled · ' + formatScheduledAt(this.scheduledAt);
+      }
+      return this.statusLabel();
     },
     // ── Save post ─────────────────────────────────────────────────────────
 
@@ -682,66 +698,176 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    // ── Publish Now ───────────────────────────────────────────────────────
+    // ── Drag-and-drop image reorder ───────────────────────────────────────
 
-    async publishNow() {
-      if (this.publishing || !this.publishUrl) return;
-      this.publishing = true;
-      this.publishResult = null;
+    isDragOver(index, type, platform = null) {
+      return this.dragOverIndex === index &&
+        this.dragOverType === type + ':' + (platform || '');
+    },
 
-      try {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
-          || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    dragStart(e, index, type, platform = null) {
+      this.dragSourceIndex = index;
+      this.dragSourceType = type;
+      this.dragSourcePlatform = platform;
+      e.dataTransfer.effectAllowed = 'move';
+    },
 
-        // Step 1: Save current form state (keep modal open)
-        await this.savePost(false);
+    dragOver(e, index, type, platform = null) {
+      if (this.dragSourceType !== type || this.dragSourcePlatform !== platform) return;
+      this.dragOverIndex = index;
+      this.dragOverType = type + ':' + (platform || '');
+    },
 
-        // Step 2: Enqueue publish task
-        const resp = await fetch(this.publishUrl, {
-          method: 'POST',
-          headers: { 'X-CSRFToken': csrfToken },
-        });
-        const data = await resp.json();
+    drop(e, targetIndex, type, platform = null) {
+      if (this.dragSourceIndex === null ||
+          this.dragSourceType !== type ||
+          this.dragSourcePlatform !== platform) return;
+      const sourceIdx = this.dragSourceIndex;
+      let arr;
+      if (type === 'shared') arr = [...this.sharedImages];
+      else if (type === 'seed') arr = [...this.seedImages];
+      else if (type === 'platform') arr = [...(this.platformImages[platform] || [])];
+      else return;
+      const [moved] = arr.splice(sourceIdx, 1);
+      arr.splice(targetIndex, 0, moved);
+      if (type === 'shared') {
+        this.sharedImages = arr;
+        this.$nextTick(() => this.syncSharedMediaFormset());
+      } else if (type === 'seed') {
+        this.seedImages = arr;
+      } else if (type === 'platform') {
+        this.platformImages = { ...this.platformImages, [platform]: arr };
+        this.$nextTick(() => this.syncPlatformMediaJson());
+      }
+      this.dragEnd();
+      this._resetCarousel();
+    },
 
-        if (data.queued && this.postId && window.PostPublishEvents) {
-          // Keep spinner on; wait for SSE event instead of closing modal
-          this.postStatus = 'publishing';
-          up.emit('social_media:changed');
-          window.PostPublishEvents.subscribe(
-            this.postId,
-            (eventData) => this._onPublishDone(eventData),
-            () => { this.publishing = false; }, // timeout fallback
-          );
-        } else {
-          this.publishing = false;
-        }
-      } catch (e) {
-        console.error('Failed to publish:', e);
-        this.publishing = false;
-        this.publishResult = { successes: [], failures: { general: e.message } };
+    dragEnd() {
+      this.dragSourceIndex = null;
+      this.dragSourceType = null;
+      this.dragSourcePlatform = null;
+      this.dragOverIndex = null;
+      this.dragOverType = null;
+    },
+
+  }));
+
+  // ── Publish Panel ────────────────────────────────────────────────────────
+
+  Alpine.data('publishPanel', () => ({
+
+    // ── State ───────────────────────────────────────────────────────────
+    view: 'options',       // 'options' | 'publishing' | 'results'
+    postStatus: '',
+    scheduledAt: '',
+    scheduleError: '',
+    scheduling: false,
+    unscheduling: false,
+    publishing: false,
+    liveResults: [],       // [{platform, success, error}] — set after SSE publish-done
+
+    postId: null,
+    publishUrl: null,
+    scheduleUrl: null,
+    unscheduleUrl: null,
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+    init() {
+      this.postId        = this.$el.dataset.postId;
+      this.postStatus    = this.$el.dataset.postStatus || '';
+      // data-scheduled-at is a UTC ISO string (with +00:00 offset); convert to local
+      // time for the datetime-local input which always works in browser-local time.
+      const rawScheduledAt = this.$el.dataset.scheduledAt || '';
+      if (rawScheduledAt) {
+        const d = new Date(rawScheduledAt);
+        this.scheduledAt = isNaN(d.getTime()) ? rawScheduledAt : toLocalISOString(d);
+      }
+      this.publishUrl    = this.$el.dataset.publishUrl;
+      this.scheduleUrl   = this.$el.dataset.scheduleUrl;
+      this.unscheduleUrl = this.$el.dataset.unscheduleUrl;
+
+      // Determine initial view from current post status
+      if (this.postStatus === 'published' || this.postStatus === 'failed') {
+        this.view = 'results';
+      } else if (this.postStatus === 'publishing') {
+        this.view = 'publishing';
+        this._subscribeSSE();
+      } else {
+        this.view = 'options';
       }
     },
 
-    // Called by SSE listener when publish task completes
-    _onPublishDone(data) {
-      this.publishing = false;
-      this.postStatus = data.status;
-      up.emit('social_media:changed');
+    // ── Status label ─────────────────────────────────────────────────────
+    statusLabel() {
+      const map = {
+        draft: 'Draft',
+        scheduled: 'Scheduled',
+        publishing: 'Publishing…',
+        published: 'Published',
+        failed: 'Failed',
+      };
+      return map[this.postStatus] || this.postStatus;
+    },
 
-      const hasFailures = data.failures && Object.keys(data.failures).length > 0;
-      if (hasFailures) {
-        // Keep modal open to show failure detail
-        this.publishResult = data;
-      } else {
-        // All platforms succeeded — close the editor
-        up.layer.accept();
+    // ── Datetime helpers ──────────────────────────────────────────────────
+    minDatetime() {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 1);
+      return toLocalISOString(now);
+    },
+
+    formatScheduledAt(iso) {
+      return formatScheduledAt(iso);
+    },
+
+    // ── Schedule ─────────────────────────────────────────────────────────
+    async schedulePost() {
+      this.scheduleError = '';
+      if (!this.scheduledAt) {
+        this.scheduleError = 'Please enter a date and time.';
+        return;
+      }
+      const dt = new Date(this.scheduledAt);
+      if (isNaN(dt.getTime())) {
+        this.scheduleError = 'Invalid date format.';
+        return;
+      }
+      if (dt <= new Date()) {
+        this.scheduleError = 'Scheduled time must be in the future.';
+        return;
+      }
+
+      this.scheduling = true;
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+      try {
+        // dt is a local-time Date (parsed from the datetime-local input); send as UTC ISO.
+        const body = new URLSearchParams({ scheduled_at: dt.toISOString() });
+        const resp = await fetch(this.scheduleUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          this.scheduleError = data.error || 'Failed to schedule.';
+          return;
+        }
+        this.postStatus = data.status;
+        // Notify editor of status change, then close only the publish panel
+        up.emit('social_media:status_changed', { status: data.status, scheduledAt: data.scheduled_at });
+        up.layer.dismiss();
+      } catch (e) {
+        this.scheduleError = 'Failed to schedule. Please try again.';
+      } finally {
+        this.scheduling = false;
       }
     },
 
     // ── Unschedule ────────────────────────────────────────────────────────
-
     async unschedulePost() {
-      if (!this.unscheduleUrl) return;
+      this.unscheduling = true;
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
         || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
       try {
@@ -751,11 +877,87 @@ document.addEventListener('alpine:init', () => {
         });
         const data = await resp.json();
         this.postStatus = data.status;
-        up.emit('social_media:changed');
+        up.emit('social_media:status_changed', { status: 'draft', scheduledAt: '' });
+        up.layer.dismiss();
       } catch (e) {
         console.error('Failed to unschedule:', e);
+      } finally {
+        this.unscheduling = false;
       }
     },
 
+    // ── Publish Now ───────────────────────────────────────────────────────
+    async publishNow() {
+      if (this.publishing || !this.publishUrl) return;
+      this.publishing = true;
+      this.view = 'publishing';
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+      try {
+        const resp = await fetch(this.publishUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+        });
+        const data = await resp.json();
+        if (data.queued && this.postId && window.PostPublishEvents) {
+          this.postStatus = 'publishing';
+          up.emit('social_media:status_changed', { status: 'publishing', scheduledAt: '' });
+          this._subscribeSSE();
+        } else {
+          this.publishing = false;
+          this.view = 'options';
+        }
+      } catch (e) {
+        console.error('Failed to publish:', e);
+        this.publishing = false;
+        this.view = 'options';
+      }
+    },
+
+    _subscribeSSE() {
+      if (!this.postId || !window.PostPublishEvents) return;
+      window.PostPublishEvents.subscribe(
+        this.postId,
+        (data) => this._onPublishDone(data),
+        () => { this.publishing = false; this.view = 'options'; },
+      );
+    },
+
+    _onPublishDone(data) {
+      this.publishing = false;
+      this.postStatus = data.status;
+      // Build liveResults for display
+      const results = [];
+      (data.successes || []).forEach(p => results.push({ platform: p, success: true, error: null }));
+      Object.entries(data.failures || {}).forEach(([p, err]) => results.push({ platform: p, success: false, error: err }));
+      this.liveResults = results;
+      this.view = 'results';
+      up.emit('social_media:status_changed', { status: data.status, scheduledAt: '' });
+      up.emit('social_media:changed');
+    },
+
   }));
+
 });
+
+// ── Shared formatting helpers ─────────────────────────────────────────────────
+
+/**
+ * Convert a Date object to a local-time ISO string suitable for datetime-local inputs.
+ * Returns "YYYY-MM-DDTHH:mm" in the browser's local timezone (no TZ suffix).
+ */
+function toLocalISOString(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
+    + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+
+function formatScheduledAt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}

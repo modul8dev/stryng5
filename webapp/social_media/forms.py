@@ -9,7 +9,7 @@ from .models import (
 class SocialMediaPostForm(forms.ModelForm):
     class Meta:
         model = SocialMediaPost
-        fields = ['title', 'shared_text', 'scheduled_at', 'topic', 'post_type', 'ai_instruction']
+        fields = ['title', 'shared_text', 'topic', 'post_type', 'ai_instruction']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
@@ -22,11 +22,6 @@ class SocialMediaPostForm(forms.ModelForm):
                 'id': 'id_shared_text',
                 'x-model': 'sharedText',
             }),
-            'scheduled_at': forms.DateTimeInput(attrs={
-                'class': 'input input-bordered w-full',
-                'type': 'datetime-local',
-                'form': 'post-form',
-            }, format='%Y-%m-%dT%H:%M'),
             'topic': forms.TextInput(attrs={
                 'class': 'input input-bordered w-full',
                 'placeholder': 'Post topic…',
@@ -44,9 +39,6 @@ class SocialMediaPostForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['title'].required = False
-        self.fields['scheduled_at'].required = False
-        if self.instance and self.instance.scheduled_at:
-            self.initial['scheduled_at'] = self.instance.scheduled_at.strftime('%Y-%m-%dT%H:%M')
 
 
 class SocialMediaPostPlatformForm(forms.ModelForm):

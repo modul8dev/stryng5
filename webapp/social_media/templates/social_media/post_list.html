@@ -40,7 +40,7 @@
                    up-history="false"
                    up-dismissable="false"
                    up-on-accepted="up.reload('.post-list')"
-                   aria-label="Edit {{ post.title }}"
+                   aria-label="Edit post"
                    class="absolute inset-0 z-0"></a>
 
                 <!-- Card header -->
@@ -51,9 +51,9 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
                         </svg>
                     </div>
-                    <!-- Title & date -->
+                    <!-- Brand & date -->
                     <div class="flex-1 min-w-0">
-                        <h3 class="font-semibold text-sm text-zinc-900 truncate leading-snug">{{ post.title }}</h3>
+                        <h3 class="font-semibold text-sm text-zinc-900 truncate leading-snug">{{ post.project.brand.name|default:"Brand" }}</h3>
                         <p class="text-xs text-zinc-400 mt-0.5">{{ post.created_at|date:"M d, Y" }}</p>
                     </div>
                     <!-- Status badge -->
@@ -127,7 +127,7 @@
                         <form method="post"
                               action="{% url 'social_media:post_delete' post.pk %}"
                               up-submit
-                              up-confirm="Delete &quot;{{ post.title }}&quot;? This cannot be undone.">
+                              up-confirm="Delete this post? This cannot be undone.">
                             {% csrf_token %}
                             <button type="submit" aria-label="Delete"
                                     class="inline-flex size-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500">

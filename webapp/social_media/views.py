@@ -418,3 +418,43 @@ def post_unschedule(request, pk):
     post.scheduled_at = None
     post.save(update_fields=['status', 'scheduled_at'])
     return JsonResponse({'status': 'draft'})
+
+
+@login_required
+@require_POST
+def post_schedule(request, pk):
+    """Validate datetime and schedule a post."""
+    from django.utils import timezone
+    from datetime import datetime as dt_class
+
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    scheduled_at_str = request.POST.get('scheduled_at', '').strip()
+
+    if not scheduled_at_str:
+        return JsonResponse({'error': 'Please enter a date and time.'}, status=400)
+    try:
+        scheduled_at = dt_class.fromisoformat(scheduled_at_str)
+        if timezone.is_naive(scheduled_at):
+            scheduled_at = timezone.make_aware(scheduled_at)
+        if scheduled_at <= timezone.now():
+            return JsonResponse({'error': 'Scheduled time must be in the future.'}, status=400)
+        post.scheduled_at = scheduled_at
+        post.status = 'scheduled'
+        post.save(update_fields=['scheduled_at', 'status'])
+        return JsonResponse({
+            'status': 'scheduled',
+            'scheduled_at': post.scheduled_at.isoformat(),
+        })
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date/time format.'}, status=400)
+
+
+@login_required
+def post_publish_panel(request, pk):
+    """Render the publish panel fragment (opened as Unpoly modal)."""
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    platforms = post.platforms.filter(is_enabled=True).order_by('platform')
+    return render(request, 'social_media/post_publish_panel.html', {
+        'post': post,
+        'platforms': platforms,
+    })
