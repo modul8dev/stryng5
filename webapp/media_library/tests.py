@@ -7,12 +7,12 @@ from django.test import TestCase
 
 from projects.models import Project
 
-from .models import ImageGroup
-from .views import (
-    _import_domain_with_crawl,
+from .image_heuristics import (
     _normalize_image_identity,
     _select_distinct_product_image_urls,
 )
+from .models import ImageGroup
+from .views import _import_domain_with_crawl
 
 
 class MediaLibraryImportTests(TestCase):

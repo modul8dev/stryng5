@@ -4,8 +4,8 @@ from urllib.parse import urljoin
 from django.core.management.base import BaseCommand, CommandError
 
 from brand.models import Brand
+from media_library.image_heuristics import _normalize_image_identity, _select_distinct_product_image_urls
 from media_library.models import ImageGroup
-from media_library.views import _normalize_image_identity, _select_distinct_product_image_urls
 from projects.models import Project
 
 
