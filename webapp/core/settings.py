@@ -49,7 +49,10 @@ if NGROK_URL:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django_cotton',
+    'django_q',
+    'django_eventstream',
     'credits',
     'projects',
     'integrations',
@@ -108,6 +111,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+ASGI_APPLICATION = 'core.asgi.application'
 
 
 # Database
@@ -115,8 +119,12 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'stryng'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 
@@ -224,6 +232,33 @@ STRIPE_PRICING_TABLE_ID = os.environ.get('STRIPE_PRICING_TABLE_ID', '')
 # ─── Credits ─────────────────────────────────────────────────────────────────
 CREDITS_SIGNUP_GRANT = int(os.environ.get('CREDITS_SIGNUP_GRANT', '50'))
 CREDITS_SIGNUP_DAYS = int(os.environ.get('CREDITS_SIGNUP_DAYS', '30'))
+
+# ─── Django Q2 ───────────────────────────────────────────────────────────────
+Q_CLUSTER = {
+    'name': 'DjangORM',
+    'workers': 2,
+    'timeout': 300,
+    'retry': 360,
+    'queue_limit': 50,
+    'bulk': 10,
+    'orm': 'default',
+}
+
+# ─── Cache ───────────────────────────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': f"redis://{os.environ.get('REDIS_HOST', 'redis')}:{os.environ.get('REDIS_PORT', '6379')}/1",
+    }
+}
+
+# ─── Django Eventstream ───────────────────────────────────────────────────────
+EVENTSTREAM_CHANNELMANAGER_CLASS = 'social_media.channelmanager.PostChannelManager'
+EVENTSTREAM_REDIS = {
+    'host': os.environ.get('REDIS_HOST', 'redis'),
+    'port': int(os.environ.get('REDIS_PORT', 6379)),
+    'db': 0,
+}
 
 # ─── Site / Campaign agents ───────────────────────────────────────────────────
 # Public-facing base URL — used by agents to build absolute image URLs.

@@ -19,6 +19,20 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
 
 WORKDIR /workspace
 
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && ln -s /root/.local/bin/uv /usr/local/bin/uv
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN uv pip install --system --no-cache -r requirements.txt
+
+# Install Node dependencies and build CSS
+COPY package.json package-lock.json* ./
+RUN npm install --silent
+COPY webapp/static/css/src/input.css webapp/static/css/src/input.css
+RUN npm run build:css
+
 # Expose application port
 EXPOSE 8100
 

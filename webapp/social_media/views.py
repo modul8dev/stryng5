@@ -27,6 +27,7 @@ from .models import (
     SocialMediaPlatformMedia,
 )
 from .publisher import publish_post
+from .tasks import publish_post_task
 
 
 def _accept_layer_response():
@@ -389,17 +390,31 @@ def ai_edit_text(request):
 @login_required
 @require_POST
 def post_publish(request, pk):
-    """Publish an existing post to all connected, enabled platforms."""
+    """Enqueue an async task to publish the post to all connected platforms."""
     post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
     base_url = request.build_absolute_uri('/').rstrip('/')
-    results = publish_post(post, request.project, base_url=base_url)
+    from django_q.tasks import async_task
+    async_task('social_media.tasks.publish_post_task', post.pk, base_url)
+    return JsonResponse({'queued': True})
 
-    successes = [p for p, r in results.items() if r['success']]
-    failures = {p: r['error'] for p, r in results.items() if not r['success']}
 
-    return JsonResponse({
-        'results': results,
-        'successes': successes,
-        'failures': failures,
-        'status': post.status,
+@login_required
+def post_publish_info(request, pk):
+    """Return publish info fragment for the given post (shown in modal)."""
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    platforms = post.platforms.filter(is_enabled=True)
+    return render(request, 'social_media/post_publish_info.html', {
+        'post': post,
+        'platforms': platforms,
     })
+
+
+@login_required
+@require_POST
+def post_unschedule(request, pk):
+    """Return a post from scheduled back to draft status."""
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    post.status = 'draft'
+    post.scheduled_at = None
+    post.save(update_fields=['status', 'scheduled_at'])
+    return JsonResponse({'status': 'draft'})

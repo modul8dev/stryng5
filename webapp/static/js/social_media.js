@@ -46,12 +46,29 @@ document.addEventListener('alpine:init', () => {
     // ── Dirty state ───────────────────────────────────────────────────────
     isDirty: false,
 
+    // ── Publish / status state ────────────────────────────────────────────
+    postStatus: '',       // mirrors server-side post.status, updated via SSE
+    postId: null,
+    unscheduleUrl: null,
+
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     init() {
       // Read publish URL from data attribute (only present for existing posts)
       this.publishUrl = this.$el.dataset.publishUrl || null;
+      this.postId = this.$el.dataset.postId || null;
+      this.postStatus = this.$el.dataset.postStatus || '';
+      this.unscheduleUrl = this.$el.dataset.unscheduleUrl || null;
 
+      // If the post was already publishing when the editor opened, start spinner + SSE
+      if (this.postStatus === 'publishing' && this.postId && window.PostPublishEvents) {
+        this.publishing = true;
+        window.PostPublishEvents.subscribe(
+          this.postId,
+          (data) => this._onPublishDone(data),
+          () => { this.publishing = false; },
+        );
+      }
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
 
@@ -630,9 +647,20 @@ document.addEventListener('alpine:init', () => {
 
     saving: false,
     publishing: false,
-    publishResult: null,   // null | { successes: [], failures: {} }
+    publishResult: null,   // null | { successes: [], failures: {} } — only for failures
     publishUrl: null,
 
+    // Returns human-readable label for current postStatus
+    statusLabel() {
+      const map = {
+        draft: 'Draft',
+        scheduled: 'Scheduled',
+        publishing: 'Publishing…',
+        published: 'Published',
+        failed: 'Failed',
+      };
+      return map[this.postStatus] || this.postStatus;
+    },
     // ── Save post ─────────────────────────────────────────────────────────
 
     async savePost(closeOnSuccess = true, action = 'draft') {
@@ -668,26 +696,64 @@ document.addEventListener('alpine:init', () => {
         // Step 1: Save current form state (keep modal open)
         await this.savePost(false);
 
-        // Step 2: Publish to connected platforms
+        // Step 2: Enqueue publish task
         const resp = await fetch(this.publishUrl, {
           method: 'POST',
           headers: { 'X-CSRFToken': csrfToken },
         });
         const data = await resp.json();
-        this.publishResult = data;
 
-        // Notify the post list to reload
-        up.emit('social_media:changed');
-
-        // Close the modal after a short delay when all platforms succeeded
-        if (data.successes && data.successes.length > 0 && Object.keys(data.failures || {}).length === 0) {
-          setTimeout(() => up.layer.accept(), 1200);
+        if (data.queued && this.postId && window.PostPublishEvents) {
+          // Keep spinner on; wait for SSE event instead of closing modal
+          this.postStatus = 'publishing';
+          up.emit('social_media:changed');
+          window.PostPublishEvents.subscribe(
+            this.postId,
+            (eventData) => this._onPublishDone(eventData),
+            () => { this.publishing = false; }, // timeout fallback
+          );
+        } else {
+          this.publishing = false;
         }
       } catch (e) {
         console.error('Failed to publish:', e);
-        this.publishResult = { successes: [], failures: { general: e.message } };
-      } finally {
         this.publishing = false;
+        this.publishResult = { successes: [], failures: { general: e.message } };
+      }
+    },
+
+    // Called by SSE listener when publish task completes
+    _onPublishDone(data) {
+      this.publishing = false;
+      this.postStatus = data.status;
+      up.emit('social_media:changed');
+
+      const hasFailures = data.failures && Object.keys(data.failures).length > 0;
+      if (hasFailures) {
+        // Keep modal open to show failure detail
+        this.publishResult = data;
+      } else {
+        // All platforms succeeded — close the editor
+        up.layer.accept();
+      }
+    },
+
+    // ── Unschedule ────────────────────────────────────────────────────────
+
+    async unschedulePost() {
+      if (!this.unscheduleUrl) return;
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+      try {
+        const resp = await fetch(this.unscheduleUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+        });
+        const data = await resp.json();
+        this.postStatus = data.status;
+        up.emit('social_media:changed');
+      } catch (e) {
+        console.error('Failed to unschedule:', e);
       }
     },
 

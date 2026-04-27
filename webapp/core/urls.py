@@ -32,6 +32,7 @@ urlpatterns = [
     path('integrations/', include('integrations.urls')),
     path('projects/', include('projects.urls')),
     path('credits/', include('credits.urls')),
+    path('events/', include('django_eventstream.urls')),
     path("", include("home.urls")),
 ]
 

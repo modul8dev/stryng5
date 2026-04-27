@@ -26,6 +26,7 @@ PLATFORM_IMAGE_LIMITS = {
 STATUS_CHOICES = [
     ('draft', 'Draft'),
     ('scheduled', 'Scheduled'),
+    ('publishing', 'Publishing'),
     ('published', 'Published'),
     ('failed', 'Failed'),
 ]
@@ -80,6 +81,7 @@ class SocialMediaPostPlatform(models.Model):
     use_shared_media = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True)
     publish_error = models.TextField(blank=True, default='')
+    published_url = models.URLField(blank=True, default='')
 
     class Meta:
         unique_together = [('post', 'platform')]

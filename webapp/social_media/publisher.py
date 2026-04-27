@@ -135,6 +135,12 @@ def publish_to_linkedin(platform_variant, connection, base_url=''):
         timeout=30,
     )
     post_resp.raise_for_status()
+    # LinkedIn REST posts API returns the post URN in the response header
+    post_urn = post_resp.headers.get('x-restli-id', '')
+    if post_urn:
+        # e.g. urn:li:share:7123456789 → no stable public URL without extra API call
+        return f'https://www.linkedin.com/feed/update/{post_urn}/'
+    return ''
 
 
 # ─── X (Twitter) ─────────────────────────────────────────────────────────────
@@ -173,6 +179,10 @@ def publish_to_twitter(platform_variant, connection, base_url=''):
         timeout=30,
     )
     tweet_resp.raise_for_status()
+    tweet_id = tweet_resp.json().get('data', {}).get('id')
+    if tweet_id:
+        return f'https://x.com/i/web/status/{tweet_id}'
+    return ''
 
 
 # ─── Facebook ─────────────────────────────────────────────────────────────────
@@ -193,6 +203,8 @@ def publish_to_facebook(platform_variant, connection, base_url=''):
             timeout=30,
         )
         resp.raise_for_status()
+        post_id = resp.json().get('id', '')
+        return f'https://www.facebook.com/{post_id}' if post_id else ''
     elif len(images) == 1:
         # Single-image post (creates the post directly)
         image_data, content_type = _get_image_bytes_and_type(images[0].image)
@@ -203,6 +215,8 @@ def publish_to_facebook(platform_variant, connection, base_url=''):
             timeout=60,
         )
         resp.raise_for_status()
+        post_id = resp.json().get('post_id', resp.json().get('id', ''))
+        return f'https://www.facebook.com/{post_id}' if post_id else ''
     else:
         # Multi-image: upload each photo as unpublished, then create feed post
         photo_ids = []
@@ -228,6 +242,8 @@ def publish_to_facebook(platform_variant, connection, base_url=''):
             timeout=30,
         )
         feed_resp.raise_for_status()
+        post_id = feed_resp.json().get('id', '')
+        return f'https://www.facebook.com/{post_id}' if post_id else ''
 
 
 def _wait_for_ig_container(container_id, access_token, timeout=90, interval=5):
@@ -330,6 +346,8 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
         timeout=30,
     )
     publish_resp.raise_for_status()
+    # Instagram Graph API does not return a stable public URL; return empty
+    return ''
 
 
 # ─── Platform registry ───────────────────────────────────────────────────────
@@ -398,11 +416,12 @@ def publish_post(post, project, base_url=''):
             continue
 
         try:
-            publisher_fn(platform_variant, connection, base_url)
+            published_url = publisher_fn(platform_variant, connection, base_url) or ''
             platform_variant.published_at = now
             platform_variant.publish_error = ''
-            platform_variant.save(update_fields=['published_at', 'publish_error'])
-            results[platform] = {'success': True, 'error': None}
+            platform_variant.published_url = published_url
+            platform_variant.save(update_fields=['published_at', 'publish_error', 'published_url'])
+            results[platform] = {'success': True, 'error': None, 'url': published_url}
             any_success = True
         except Exception as exc:
             error_msg = str(exc)
