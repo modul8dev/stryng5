@@ -6,17 +6,21 @@ class SocialMediaConfig(AppConfig):
     name = "social_media"
 
     def ready(self):
-        try:
-            from django_q.models import Schedule
-            Schedule.objects.get_or_create(
-                func='social_media.tasks.check_scheduled_posts',
-                defaults={
-                    'schedule_type': Schedule.MINUTES,
-                    'minutes': 1,
-                    'repeats': -1,
-                    'name': 'Check scheduled social media posts',
-                },
-            )
-        except Exception:
-            # DB may not be ready (e.g. during initial migrate)
-            pass
+        from django.db.models.signals import post_migrate
+        post_migrate.connect(_setup_schedule, sender=self)
+
+
+def _setup_schedule(sender, **kwargs):
+    try:
+        from django_q.models import Schedule
+        Schedule.objects.get_or_create(
+            func='social_media.tasks.check_scheduled_posts',
+            defaults={
+                'schedule_type': Schedule.MINUTES,
+                'minutes': 1,
+                'repeats': -1,
+                'name': 'Check scheduled social media posts',
+            },
+        )
+    except Exception:
+        pass

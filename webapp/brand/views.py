@@ -192,9 +192,6 @@ def _scrape_brand_data(user, project, url):
     if branding_secondary_color:
         brand_secondary_color = branding_secondary_color
 
-    # ── Import products (Shopify, WooCommerce, or domain crawl) ─────────────
-    _detect_and_import_products(user, url, project=project)  # errors are non-fatal
-
     # ── Create logo ImageGroup ───────────────────────────────────────────────
     logo_group = None
     if logo_url:
@@ -267,20 +264,35 @@ def brand_scrape_modal(request):
     if request.method == 'POST':
         form = ScrapeURLForm(request.POST)
         if form.is_valid():
+            if brand.processing_status == Brand.ProcessingStatus.SCRAPING:
+                return render(request, 'brand/scrape_modal.html', {
+                    'form': form,
+                    'brand': brand,
+                    'already_scraping': True,
+                })
             url = form.cleaned_data['url']
-            success, error = _scrape_brand_data(request.user, request.project, url)
-            if success:
-                response = _accept_layer_response()
-                response['X-Up-Events'] = '[{"type":"brand:scraped"}]'
-                return response
-            return render(request, 'brand/scrape_modal.html', {
+            Brand.objects.filter(pk=brand.pk).update(
+                processing_status=Brand.ProcessingStatus.SCRAPING,
+                scrape_error='',
+                website_url=url,
+            )
+            from django_q.tasks import async_task
+            from .tasks import scrape_brand_task
+            async_task(
+                scrape_brand_task, brand.pk, url,
+                user_id=request.user.id
+            )
+            response = render(request, 'brand/scrape_modal.html', {
                 'form': form,
-                'error': error,
+                'brand': brand,
+                'scraping_started': True,
             })
+            response['X-Up-Events'] = '[{"type":"brand:scrape_started"}]'
+            return response
     else:
         form = ScrapeURLForm(initial={'url': initial_url})
 
-    return render(request, 'brand/scrape_modal.html', {'form': form})
+    return render(request, 'brand/scrape_modal.html', {'form': form, 'brand': brand})
 
 
 @login_required
@@ -289,12 +301,28 @@ def brand_onboarding(request):
         form = ScrapeURLForm(request.POST)
         if form.is_valid():
             url = form.cleaned_data['url']
-            success, error = _scrape_brand_data(request.user, request.project, url)
-            if success:
-                return redirect('/')
+            brand, _ = Brand.objects.get_or_create(project=request.project, defaults={'user': request.user})
+            if brand.processing_status == Brand.ProcessingStatus.SCRAPING:
+                return render(request, 'brand/onboarding.html', {
+                    'form': form,
+                    'already_scraping': True,
+                })
+            Brand.objects.filter(pk=brand.pk).update(
+                processing_status=Brand.ProcessingStatus.SCRAPING,
+                scrape_error='',
+                website_url=url,
+            )
+            from django_q.tasks import async_task
+            from .tasks import scrape_brand_task
+            async_task(
+                scrape_brand_task, brand.pk, url,
+                user_id=request.user.id,
+                q_options={'task_name': 'scrape_brand'},
+            )
             return render(request, 'brand/onboarding.html', {
                 'form': form,
-                'error': error,
+                'scraping_started': True,
+                'project_id': request.project.pk,
             })
     else:
         form = ScrapeURLForm()

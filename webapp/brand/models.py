@@ -30,6 +30,18 @@ class Brand(models.Model):
         on_delete=models.SET_NULL,
         related_name='logo_brands',
     )
+    class ProcessingStatus(models.TextChoices):
+        IDLE = 'idle', 'Idle'
+        SCRAPING = 'scraping', 'Scraping'
+        ERROR = 'error', 'Error'
+
+    processing_status = models.CharField(
+        max_length=20,
+        choices=ProcessingStatus.choices,
+        default=ProcessingStatus.IDLE,
+    )
+    scrape_error = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

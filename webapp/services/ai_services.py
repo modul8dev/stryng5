@@ -24,6 +24,7 @@ def _get_openai_client():
 def _openai_chat(messages, model=OpenAIModel.QUICK, **kwargs):
     """Send a chat request to OpenAI and return the response text."""
     client = _get_openai_client()
+    kwargs.setdefault("reasoning_effort", "low")
     kwargs.update(
         model=model.value,
         messages=messages,

@@ -18,8 +18,18 @@ def _notify_publish_done(post_id, post_status, results):
     """Send SSE event so the browser knows publishing has completed."""
     successes = [p for p, r in results.items() if r['success']]
     failures = {p: r['error'] for p, r in results.items() if not r['success']}
+
+    # Resolve user_id from the post
     try:
-        send_event(f'post-{post_id}', 'publish-done', {
+        user_id = SocialMediaPost.objects.values_list('user_id', flat=True).get(pk=post_id)
+    except SocialMediaPost.DoesNotExist:
+        logger.error('_notify_publish_done: post %d not found', post_id)
+        return
+
+    try:
+        send_event(f'user-{user_id}', 'message', {
+            'type': 'publish-done',
+            'post_id': post_id,
             'status': post_status,
             'successes': successes,
             'failures': failures,

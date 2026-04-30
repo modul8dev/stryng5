@@ -18,6 +18,7 @@
         up.layer.config.overlay.openDuration = 500
         up.layer.config.modal.closeAnimation = 'move-to-top'
         up.layer.config.overlay.closeDuration = 500
+        up.fragment.config.navigateOptions.cache = false
     </script>
     {% block head %}{% endblock %}
 </head>
@@ -31,7 +32,9 @@
         <div class="drawer-content flex min-h-screen flex-col" up-main>
 
             <!-- ─── Sticky header ─────────────────────────────────────── -->
-            <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+            <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-md sm:px-6"
+                    x-data="appHeader({ projectId: {% if current_project %}{{ current_project.pk }}{% else %}null{% endif %}, isScraping: {% if current_project and current_project.brand.processing_status == 'scraping' %}true{% else %}false{% endif %} })"
+            >
 
                 <!-- Mobile sidebar toggle -->
                 <label for="sidebar-toggle" aria-label="Open sidebar"
@@ -75,6 +78,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
                     </button>
+
+                    <!-- Brand scraping indicator -->
+                    <div x-show="isScraping"
+                         x-cloak
+                         class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
+                        <span class="loading loading-spinner loading-xs text-indigo-600"></span>
+                        Scraping brand…
+                    </div>
 
                     <!-- Help -->
                     <button type="button" aria-label="Help"
@@ -328,7 +339,9 @@
     <script src="{% static 'js/components/ai-textarea.js' %}"></script>
     <script src="{% static 'django_eventstream/eventsource.min.js' %}"></script>
     <script src="{% static 'django_eventstream/reconnecting-eventsource.js' %}"></script>
+    {% if user.is_authenticated %}<script>window.__USER_ID__ = {{ user.id }};</script>{% endif %}
     <script src="{% static 'js/publish_events.js' %}"></script>
+    <script src="{% static 'js/app-header.js' %}"></script>
     <script src="{% static 'js/social_media.js' %}"></script>
     <script src="{% static 'js/image_editor.js' %}"></script>
     <script src="{% static 'js/scheduler.js' %}"></script>
@@ -336,6 +349,13 @@
     <script>if (window.marked) { marked.use({ breaks: true, gfm: true }); }</script>
     <script src="{% static 'js/preview-img.js' %}"></script>
     <script async src="https://js.stripe.com/v3/pricing-table.js"></script>
+
+    <!-- Toast container -->
+    <div id="app-toast-container"
+         class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+         style="min-width: 280px; max-width: 360px;">
+    </div>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -899,7 +899,7 @@ document.addEventListener('alpine:init', () => {
           headers: { 'X-CSRFToken': csrfToken },
         });
         const data = await resp.json();
-        if (data.queued && this.postId && window.PostPublishEvents) {
+        if (data.queued && this.postId) {
           this.postStatus = 'publishing';
           up.emit('social_media:status_changed', { status: 'publishing', scheduledAt: '' });
           this._subscribeSSE();
@@ -915,12 +915,29 @@ document.addEventListener('alpine:init', () => {
     },
 
     _subscribeSSE() {
-      if (!this.postId || !window.PostPublishEvents) return;
-      window.PostPublishEvents.subscribe(
-        this.postId,
-        (data) => this._onPublishDone(data),
-        () => { this.publishing = false; this.view = 'options'; },
-      );
+      if (!this.postId) return;
+      const postId = this.postId;
+      let timer = null;
+
+      const handler = (e) => {
+        if (e.detail && e.detail.post_id == postId) {
+          cleanup();
+          this._onPublishDone(e.detail);
+        }
+      };
+
+      const cleanup = () => {
+        document.removeEventListener('publish-done', handler);
+        if (timer) { clearTimeout(timer); timer = null; }
+      };
+
+      document.addEventListener('publish-done', handler);
+
+      timer = setTimeout(() => {
+        cleanup();
+        this.publishing = false;
+        this.view = 'options';
+      }, 6 * 60 * 1000);
     },
 
     _onPublishDone(data) {

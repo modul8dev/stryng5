@@ -6,3 +6,6 @@ class BrandConfig(AppConfig):
     name = 'brand'
     verbose_name = 'Brand'
 
+    def ready(self):
+        import brand.tasks  # noqa: F401 — registers pre_enqueue signal receiver
+

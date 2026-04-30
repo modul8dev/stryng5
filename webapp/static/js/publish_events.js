@@ -1,50 +1,17 @@
-/* ── Publish Events — SSE client for post publish status ── */
+if (window.__USER_ID__) {
+  const channel = 'user-' + window.__USER_ID__;
+  window.SSE = new ReconnectingEventSource('/events/?channel=' + channel);
 
-window.PostPublishEvents = (() => {
-  'use strict';
+  window.SSE.onopen = function () { console.debug('[SSE] connected ' + channel); };
+  window.SSE.onerror = function (e) { console.debug('[SSE] error ' + channel, e); };
 
-  let source = null;
-  let timeoutHandle = null;
-
-  const TIMEOUT_MS = 6 * 60 * 1000; // 6 minutes — matches Q_CLUSTER timeout + grace
-
-  function _cleanup() {
-    if (source) { source.close(); source = null; }
-    if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null; }
-  }
-
-  return {
-    /**
-     * Subscribe to publish-done events for the given post ID.
-     * onDone({ status, successes, failures }) called once on completion.
-     * onTimeout() called if no event arrives within TIMEOUT_MS.
-     */
-    subscribe(postId, onDone, onTimeout) {
-      _cleanup();
-
-      // ReconnectingEventSource (bundled with django-eventstream) handles
-      // reconnects and Last-Event-ID tracking automatically.
-      source = new ReconnectingEventSource(`/events/?channel=post-${postId}`);
-
-      source.addEventListener('publish-done', (e) => {
-        const data = JSON.parse(e.data);
-        _cleanup();
-        onDone(data);
-      });
-
-      source.addEventListener('stream-error', (e) => {
-        const { condition } = JSON.parse(e.data);
-        console.error('PostPublishEvents: stream-error', condition);
-        _cleanup();
-        if (onTimeout) onTimeout();
-      });
-
-      timeoutHandle = setTimeout(() => {
-        _cleanup();
-        if (onTimeout) onTimeout();
-      }, TIMEOUT_MS);
-    },
-
-    unsubscribe: _cleanup,
-  };
-})();
+  // All server-sent events use the default 'message' type with a 'type'
+  // field in the JSON payload. A single listener here bridges them all to
+  // document CustomEvents — no list to maintain, every event is handled.
+  window.SSE.addEventListener('message', function (e) {
+    var detail = JSON.parse(e.data || '{}');
+    if (!detail.type) return;
+    console.debug('[SSE] received', detail.type, detail);
+    document.dispatchEvent(new CustomEvent(detail.type, { detail: detail }));
+  });
+}
