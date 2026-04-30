@@ -10,20 +10,27 @@
  *   <header x-data="appHeader({ projectId: 123, isScraping: false })">
  */
 
-function appHeader({ projectId = null, isScraping = false } = {}) {
+function appHeader({ projectId = null, isScraping = false, isImporting = false } = {}) {
   return {
     // ── Brand scraping state ─────────────────────────────────────────
     isScraping,
 
+    // ── Product import state ─────────────────────────────────────────
+    isImporting,
+
     // ── Lifecycle ────────────────────────────────────────────────────
     init() {
       this._listenBrandEvents();
+      this._listenImportEvents();
     },
 
     destroy() {
       document.removeEventListener('brand:scrape_started', this._onScrapingStarted);
       document.removeEventListener('brand:scrape_completed', this._onScraped);
       document.removeEventListener('brand:scrape_error', this._onScrapeError);
+      document.removeEventListener('media_library:import_started', this._onImportStarted);
+      document.removeEventListener('media_library:import_completed', this._onImportCompleted);
+      document.removeEventListener('media_library:import_error', this._onImportError);
     },
 
     // ── Brand scraping events ────────────────────────────────────────
@@ -42,6 +49,24 @@ function appHeader({ projectId = null, isScraping = false } = {}) {
       document.addEventListener('brand:scrape_started', this._onScrapingStarted);
       document.addEventListener('brand:scrape_completed', this._onScraped);
       document.addEventListener('brand:scrape_error', this._onScrapeError);
+    },
+
+    // ── Product import events ────────────────────────────────────────
+    _listenImportEvents() {
+      this._onImportStarted = () => { this.isImporting = true; };
+      this._onImportCompleted = () => {
+        this.isImporting = false;
+        this.toast('Product import complete!', 'success');
+      };
+      this._onImportError = (e) => {
+        this.isImporting = false;
+        const msg = (e.detail && e.detail.error) || 'Product import failed.';
+        this.toast(msg, 'error');
+      };
+
+      document.addEventListener('media_library:import_started', this._onImportStarted);
+      document.addEventListener('media_library:import_completed', this._onImportCompleted);
+      document.addEventListener('media_library:import_error', this._onImportError);
     },
 
     // ── Toast notifications ──────────────────────────────────────────

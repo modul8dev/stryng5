@@ -378,18 +378,37 @@ def _detect_and_import_products(user, shop_url, project=None):
 @login_required
 def products_import(request):
     if request.method == 'POST':
+        if request.project.product_import_in_progress:
+            return render(request, 'media_library/products_import.html', {
+                'error': 'A product import is already in progress. Please wait for it to finish.',
+                'shop_url': '',
+                'importing': True,
+            })
+
         shop_url = request.POST.get('shop_url', '').strip()
-        success, error = _detect_and_import_products(request.user, shop_url, project=request.project)
+        if not shop_url:
+            return render(request, 'media_library/products_import.html', {
+                'error': 'Please enter a store URL.',
+                'shop_url': shop_url,
+            })
 
-        if success:
-            return _accept_layer_response()
+        request.project.product_import_in_progress = True
+        request.project.save(update_fields=['product_import_in_progress'])
 
-        return render(request, 'media_library/products_import.html', {
-            'error': error,
-            'shop_url': shop_url,
-        })
+        from django_q.tasks import async_task
+        from .tasks import import_products_task
+        async_task(
+            import_products_task,
+            request.project.pk,
+            shop_url,
+            user_id=request.user.pk,
+        )
 
-    return render(request, 'media_library/products_import.html')
+        return render(request, 'media_library/products_import.html', {'importing': True})
+
+    return render(request, 'media_library/products_import.html', {
+        'importing': request.project.product_import_in_progress,
+    })
 
 
 class _ImgSrcParser(HTMLParser):

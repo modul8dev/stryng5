@@ -3,6 +3,22 @@
     <h2 class="text-xl font-bold mb-2">Import Products</h2>
     <p class="text-sm text-zinc-500 mb-6">Enter your store URL. Shopify and WooCommerce stores are detected automatically.</p>
 
+    {% if importing %}
+    <div x-data="productImportModal({ importing: true })">
+        <div x-show="error" class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4" style="display:none">
+            <span x-text="error"></span>
+        </div>
+        <div x-show="importing" class="flex flex-col items-center justify-center py-8">
+            <span class="loading loading-spinner loading-lg text-indigo-600"></span>
+            <p class="mt-4 text-sm text-zinc-500">Product import is running in the background…</p>
+            <p class="mt-1 text-xs text-zinc-400">You will be notified when it finishes.</p>
+        </div>
+        <div class="flex justify-end">
+            <button type="button" class="btn btn-ghost" up-dismiss>Close</button>
+        </div>
+    </div>
+    {% else %}
+
     {% if error %}
     <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
         {{ error }}
@@ -11,12 +27,10 @@
 
     <form method="post"
           up-submit
-          up-layer="current"
-          x-data="{ importing: false }"
-          @submit="importing = true">
+          up-layer="current">
         {% csrf_token %}
 
-        <div class="form-control w-full mb-6" x-show="!importing">
+        <div class="form-control w-full mb-6">
             <label class="label" for="shop_url">
                 <span class="label-text font-medium">Store URL</span>
             </label>
@@ -32,16 +46,11 @@
             </label>
         </div>
 
-        <div class="flex flex-col items-center justify-center py-8" x-show="importing" style="display:none">
-            <span class="loading loading-spinner loading-lg text-indigo-600"></span>
-            <p class="mt-4 text-sm text-zinc-500">Detecting store and importing products…</p>
-            <p class="mt-1 text-xs text-zinc-400">This may take a moment.</p>
-        </div>
-
-        <div class="flex justify-end gap-2" x-show="!importing">
+        <div class="flex justify-end gap-2">
             <button type="button" class="btn btn-ghost" up-dismiss>Cancel</button>
             <button type="submit" class="btn btn-primary">Import</button>
         </div>
     </form>
+    {% endif %}
 </div>
 </main>

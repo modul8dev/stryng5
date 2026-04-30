@@ -13,6 +13,7 @@ class Project(models.Model):
     enable_x = models.BooleanField(default=True)
     enable_facebook = models.BooleanField(default=True)
     enable_instagram = models.BooleanField(default=True)
+    product_import_in_progress = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

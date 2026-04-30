@@ -33,7 +33,7 @@
 
             <!-- ─── Sticky header ─────────────────────────────────────── -->
             <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-md sm:px-6"
-                    x-data="appHeader({ projectId: {% if current_project %}{{ current_project.pk }}{% else %}null{% endif %}, isScraping: {% if current_project and current_project.brand.processing_status == 'scraping' %}true{% else %}false{% endif %} })"
+                    x-data="appHeader({ projectId: {% if current_project %}{{ current_project.pk }}{% else %}null{% endif %}, isScraping: {% if current_project and current_project.brand.processing_status == 'scraping' %}true{% else %}false{% endif %}, isImporting: {% if current_project and current_project.product_import_in_progress %}true{% else %}false{% endif %} })"
             >
 
                 <!-- Mobile sidebar toggle -->
@@ -85,6 +85,14 @@
                          class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700">
                         <span class="loading loading-spinner loading-xs text-indigo-600"></span>
                         Scraping brand…
+                    </div>
+
+                    <!-- Product import indicator -->
+                    <div x-show="isImporting"
+                         x-cloak
+                         class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+                        <span class="loading loading-spinner loading-xs text-emerald-600"></span>
+                        Importing products…
                     </div>
 
                     <!-- Help -->

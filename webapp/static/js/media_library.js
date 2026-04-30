@@ -30,6 +30,53 @@ function mlAddUrlImageRow(url) {
   totalInput.value = idx + 1;
 }
 
+/* ── Product Import Modal — Alpine.js component for the import overlay ──
+ *
+ * When importing=true, listens for media_library:import_completed (accepts
+ * the layer) or media_library:import_error (shows inline error).
+ *
+ * Usage in template:
+ *   <div x-data="productImportModal({ importing: true })">
+ */
+function productImportModal({ importing = false } = {}) {
+  return {
+    importing,
+    error: '',
+
+    init() {
+      if (!this.importing) return;
+      this._bindEvents();
+    },
+
+    _bindEvents() {
+      this._onCompleted = () => {
+        this._cleanup();
+        try {
+          if (up.layer.count > 1) up.layer.accept();
+        } catch (e) {}
+      };
+
+      this._onError = (e) => {
+        this._cleanup();
+        this.importing = false;
+        this.error = (e.detail && e.detail.error) || 'Import failed.';
+      };
+
+      document.addEventListener('media_library:import_completed', this._onCompleted);
+      document.addEventListener('media_library:import_error', this._onError);
+    },
+
+    _cleanup() {
+      document.removeEventListener('media_library:import_completed', this._onCompleted);
+      document.removeEventListener('media_library:import_error', this._onError);
+    },
+
+    destroy() {
+      this._cleanup();
+    },
+  };
+}
+
 up.compiler('#formset-container', function (container) {
   'use strict';
 
