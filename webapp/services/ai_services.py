@@ -11,7 +11,7 @@ from services.prompts.social_media_topic import SOCIAL_MEDIA_TOPIC_PROMPT
 
 
 class OpenAIModel(Enum):
-    QUICK = 'gpt-4o-mini'
+    QUICK = 'gpt-5-nano'
     NORMAL = 'gpt-5-mini'
     FULL = 'gpt-5'
 
@@ -24,10 +24,10 @@ def _get_openai_client():
 def _openai_chat(messages, model=OpenAIModel.QUICK, **kwargs):
     """Send a chat request to OpenAI and return the response text."""
     client = _get_openai_client()
-    kwargs.setdefault("reasoning_effort", "low")
+    kwargs.setdefault("reasoning", {"effort": "low"})
     kwargs.update(
         model=model.value,
-        messages=messages,
+        input=messages,
     )
     response = client.responses.create(**kwargs)
     return response.output_text.strip()
