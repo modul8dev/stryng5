@@ -184,11 +184,13 @@ def _import_shopify_products(user, base_url, project=None):
         body_html = product.get('body_html') or ''
         description = strip_tags(body_html).strip()[:500]
 
+        product_url = f'https://{shop_domain}/products/{product.get("handle", "")}' if product.get('handle') else base_url
         group = ImageGroup.objects.create(
             user=user,
             project=project,
             title=title,
             description=description,
+            source_url=product_url,
             type=ImageGroup.GroupType.PRODUCT,
         )
 
@@ -260,11 +262,13 @@ def _import_woocommerce_products(user, base_url, project=None):
         description_html = product.get('description') or product.get('short_description') or ''
         description = strip_tags(description_html).strip()[:500]
 
+        product_link = product.get('permalink') or base_url
         group = ImageGroup.objects.create(
             user=user,
             project=project,
             title=name,
             description=description,
+            source_url=product_link,
             type=ImageGroup.GroupType.PRODUCT,
         )
 
@@ -338,6 +342,7 @@ def _import_domain_with_crawl(user, base_url, project=None):
             project=project,
             title=context['title'],
             description=context['description'],
+            source_url=context['page_url'],
             type=ImageGroup.GroupType.PRODUCT,
         )
         for img_url in image_urls:
@@ -475,7 +480,8 @@ def _import_url_images(user, page_url, project=None):
         user=user,
         project=project,
         title=title,
-        type=ImageGroup.GroupType.MANUAL,
+        source_url=page_url,
+        type=ImageGroup.GroupType.PRODUCT,
     )
     for url in image_urls:
         Image.objects.create(image_group=group, external_url=url)

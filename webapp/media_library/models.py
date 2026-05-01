@@ -20,6 +20,7 @@ class ImageGroup(models.Model):
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    source_url = models.URLField(blank=True, null=True)
     type = models.CharField(
         max_length=20,
         choices=GroupType.choices,

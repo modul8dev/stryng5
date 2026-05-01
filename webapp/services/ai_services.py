@@ -11,7 +11,7 @@ from services.prompts.social_media_topic import SOCIAL_MEDIA_TOPIC_PROMPT
 
 
 class OpenAIModel(Enum):
-    QUICK = 'gpt-5-nano'
+    QUICK = 'gpt-4o-mini'
     NORMAL = 'gpt-5-mini'
     FULL = 'gpt-5'
 
@@ -29,8 +29,8 @@ def _openai_chat(messages, model=OpenAIModel.QUICK, **kwargs):
         model=model.value,
         messages=messages,
     )
-    response = client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content.strip()
+    response = client.responses.create(**kwargs)
+    return response.output_text.strip()
 
 
 def _get_gemini_client():

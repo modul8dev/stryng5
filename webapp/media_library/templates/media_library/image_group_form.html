@@ -60,6 +60,17 @@
                 </c-ai_textarea>
             </div>
 
+            {# ── Source URL (read-only, edit mode only) ── #}
+            {% if is_edit and group.source_url %}
+            <div class="form-control w-full mb-6">
+                <label class="label">
+                    <span class="label-text font-medium">Source URL</span>
+                </label>
+                <a href="{{ group.source_url }}" target="_blank" rel="noopener noreferrer"
+                   class="link link-primary text-sm break-all">{{ group.source_url }}</a>
+            </div>
+            {% endif %}
+
             {# ── Images section ── #}
             <div class="divider">Images</div>
 
