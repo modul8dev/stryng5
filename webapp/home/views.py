@@ -65,12 +65,17 @@ def home(request):
         .order_by('-created_at')[:6]
     )
 
+    is_scraping = brand is not None and brand.processing_status == Brand.ProcessingStatus.SCRAPING
+    is_importing = bool(request.project and request.project.product_import_in_progress)
+
     return render(request, "home/home.html", {
         'drafts': drafts,
         'scheduled_posts': scheduled_posts,
         'brand': brand,
         'has_brand': has_brand,
         'has_products': has_products,
+        'is_scraping': is_scraping,
+        'is_importing': is_importing,
         'image_groups': image_groups,
     })
 

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{% static 'css/src/output.css' %}">
-    <title>Set up your brand</title>
+    <title>Set up your project</title>
 </head>
 
 <body class="flex min-h-screen items-center justify-center bg-zinc-50 text-zinc-900 antialiased">
@@ -38,8 +38,17 @@
         <!-- Card -->
         <div class="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
 
-            <h2 class="mb-1 text-center text-lg font-semibold text-zinc-900">Set up your brand</h2>
-            <p class="mb-6 text-center text-sm text-zinc-500">Enter your website URL and we'll automatically extract your brand identity — name, summary, logo, and style guide.</p>
+            <h2 class="mb-1 text-center text-lg font-semibold text-zinc-900">Set up your project</h2>
+            <p class="mb-6 text-center text-sm text-zinc-500">Enter your website URL and select the language we'll use to generate content for you. We'll automatically extract your brand identity and import products.</p>
+
+            {% if provisioning_started %}
+            <div class="flex flex-col items-center justify-center py-6">
+                <span class="loading loading-spinner loading-lg text-indigo-600"></span>
+                <p class="mt-4 text-sm text-zinc-500">Setting up your project…</p>
+                <p class="mt-1 text-xs text-zinc-400">We're scraping your brand and importing products.</p>
+                <a href="/" class="btn btn-ghost btn-sm mt-6">Continue to dashboard</a>
+            </div>
+            {% else %}
 
             {% if error %}
             <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
@@ -51,26 +60,36 @@
                 {% csrf_token %}
 
                 <div id="url-field" class="mb-4">
-                    <label for="id_url" class="mb-1 block text-sm font-medium text-zinc-700">Website URL</label>
-                    {{ form.url }}
-                    {% if form.url.errors %}
-                    <p class="mt-1 text-xs text-red-600">{{ form.url.errors.0 }}</p>
+                    <label for="id_domain" class="mb-1 block text-sm font-medium text-zinc-700">Website URL</label>
+                    {{ form.domain }}
+                    {% if form.domain.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ form.domain.errors.0 }}</p>
                     {% endif %}
+                </div>
+
+                <div id="language-field" class="mb-4">
+                    <label for="id_language" class="mb-1 block text-sm font-medium text-zinc-700">Content Language</label>
+                    {{ form.language }}
+                    {% if form.language.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ form.language.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-xs text-zinc-400">We'll generate all content in this language.</p>
                 </div>
 
                 <div id="scrape-spinner" style="display:none" class="flex flex-col items-center justify-center py-6">
                     <span class="loading loading-spinner loading-lg text-indigo-600"></span>
-                    <p class="mt-4 text-sm text-zinc-500">Scraping brand data…</p>
+                    <p class="mt-4 text-sm text-zinc-500">Setting up your project…</p>
                     <p class="mt-1 text-xs text-zinc-400">This may take a moment.</p>
                 </div>
 
                 <div id="form-actions">
                     <button type="submit" class="btn btn-primary btn-block mt-2 rounded-lg text-sm"
-                            onclick="document.getElementById('scrape-spinner').style.display='flex';document.getElementById('form-actions').style.display='none';document.getElementById('url-field').style.display='none'">
-                        Scrape my brand
+                            onclick="document.getElementById('scrape-spinner').style.display='flex';document.getElementById('form-actions').style.display='none';document.getElementById('url-field').style.display='none';document.getElementById('language-field').style.display='none'">
+                        Set up my project
                     </button>
                 </div>
             </form>
+            {% endif %}
 
         </div>
 

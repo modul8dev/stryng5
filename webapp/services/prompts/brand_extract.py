@@ -3,7 +3,6 @@ You are a brand analyst. Given the markdown content of a brand website, extract 
 Respond with a valid JSON object containing exactly these keys:
 "name" (brand name as a short string),
 "summary" (2-3 sentence brand description),
-"language" (primary language of the website, e.g. "English"),
 "style_guide" (overall brand style, visual identity, and messaging principles — 2-4 sentences),
 "tone_of_voice" (how the brand communicates: formal/casual, playful/serious, inspiring/informative etc. — 2-4 sentences),
 "target_audience" (description of the ideal customer: demographics, interests, needs — 2-4 sentences),

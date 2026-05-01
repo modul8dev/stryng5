@@ -54,19 +54,32 @@ def _get_brand_context(brand):
     return {
         'brand_name': brand.name or 'Unknown',
         'brand_summary': brand.summary or '',
-        'brand_language': brand.language or 'English',
         'brand_style_guide': brand.style_guide or '',
     }
 
 
-def extract_brand_data(markdown_content):
+def _get_language_instruction(brand):
+    """Return a concrete language instruction string based on the project language."""
+    project = brand.project
+    language_code = getattr(project, 'language', '') or 'en'
+    from django.conf.global_settings import LANGUAGES
+    language_name = dict(LANGUAGES).get(language_code, 'English')
+    from services.prompts.language import get_language_instruction
+    return get_language_instruction(language_name)
+
+
+def extract_brand_data(markdown_content, language_instruction=None):
     """Extract structured brand data from markdown content using OpenAI. Returns a dict."""
     import json
     from services.prompts.brand_extract import BRAND_EXTRACT_PROMPT
 
+    system_content = BRAND_EXTRACT_PROMPT
+    if language_instruction:
+        system_content = system_content.rstrip() + f'\n{language_instruction}'
+
     raw = _openai_chat(
         messages=[
-            {'role': 'system', 'content': BRAND_EXTRACT_PROMPT},
+            {'role': 'system', 'content': system_content},
             {'role': 'user', 'content': markdown_content[:20000]},
         ],
         response_format={'type': 'json_object'},
@@ -118,12 +131,16 @@ def suggest_topic(brand, seed_images):
     """Suggest topics based on brand context and seed images. Returns a list."""
     import re
     ctx = _get_brand_context(brand)
+    lang = _get_language_instruction(brand)
     prompt = SOCIAL_MEDIA_TOPIC_PROMPT.format(
         image_descriptions=_build_image_descriptions(seed_images),
         **ctx,
     )
     raw = _openai_chat(
-        messages=[{'role': 'user', 'content': prompt}],
+        messages=[
+            {'role': 'system', 'content': lang},
+            {'role': 'user', 'content': prompt},
+        ],
     )
     topics = []
     for line in raw.splitlines():
@@ -149,16 +166,32 @@ def _generate_gemini_image(prompt, input_images=None):
     }
 
     client = _get_gemini_client()
+    def _open_as_pil(path_or_bytes, is_bytes=False):
+        """Open an image as PIL, converting SVG to PNG via cairosvg if needed."""
+        if is_bytes:
+            return PILImage.open(BytesIO(path_or_bytes))
+        if path_or_bytes.lower().endswith('.svg'):
+            import cairosvg
+            png_bytes = cairosvg.svg2png(url=path_or_bytes)
+            return PILImage.open(BytesIO(png_bytes))
+        return PILImage.open(path_or_bytes)
+
     pil_images = []
     try:
         for img in (input_images or []):
             if img.image and img.image.name:
-                pil_images.append(PILImage.open(img.image.path))
+                pil_images.append(_open_as_pil(img.image.path))
             elif img.external_url:
                 try:
                     resp = requests.get(img.external_url, headers=_browser_headers, timeout=15)
                     resp.raise_for_status()
-                    pil_images.append(PILImage.open(BytesIO(resp.content)))
+                    content_type = resp.headers.get('Content-Type', '')
+                    if 'svg' in content_type or img.external_url.lower().endswith('.svg'):
+                        import cairosvg
+                        png_bytes = cairosvg.svg2png(bytestring=resp.content)
+                        pil_images.append(PILImage.open(BytesIO(png_bytes)))
+                    else:
+                        pil_images.append(PILImage.open(BytesIO(resp.content)))
                 except requests.RequestException as exc:
                     raise RuntimeError(f'Failed to fetch image from {img.external_url}: {exc}') from exc
 
@@ -187,6 +220,7 @@ def _generate_gemini_image(prompt, input_images=None):
 def generate_post_text(brand, topic, post_type, seed_images, platforms):
     """Generate post text using OpenAI."""
     ctx = _get_brand_context(brand)
+    lang = _get_language_instruction(brand)
     prompt = SOCIAL_MEDIA_GENERATE_PROMPT.format(
         topic=topic or 'general brand post',
         post_type=post_type or 'lifestyle',
@@ -194,7 +228,10 @@ def generate_post_text(brand, topic, post_type, seed_images, platforms):
         image_descriptions=_build_image_descriptions(seed_images),
         **ctx,
     )
-    return _openai_chat(messages=[{'role': 'user', 'content': prompt}])
+    return _openai_chat(messages=[
+        {'role': 'system', 'content': lang},
+        {'role': 'user', 'content': prompt},
+    ])
 
 def _generate_image_prompt(brand, topic, post_type, seed_images):
     """Use OpenAI to generate a detailed image prompt based on brand, topic, post type, and seed images."""
@@ -206,8 +243,7 @@ def _generate_image_prompt(brand, topic, post_type, seed_images):
     brand_info = (
         f"Name: {ctx['brand_name']}\n"
         f"Summary: {ctx['brand_summary']}\n"
-        f"Style: {ctx['brand_style_guide']}\n"
-        f"Language: {ctx['brand_language']}"
+        f"Style: {ctx['brand_style_guide']}"
     )
     product_info = _build_image_descriptions(seed_images) or 'No product reference provided.'
 
@@ -281,6 +317,7 @@ def generate_post_image(brand, topic, post_type, seed_images, user, project=None
 def edit_text(action, text, brand, platform=None, instruction=None, system_prompt_key=None):
     """Apply an AI edit action to text."""
     ctx = _get_brand_context(brand)
+    lang = _get_language_instruction(brand)
 
     action_template = EDIT_ACTIONS.get(action)
     if not action_template:
@@ -293,6 +330,7 @@ def edit_text(action, text, brand, platform=None, instruction=None, system_promp
     )
     system_prompt_template = SYSTEM_PROMPTS.get(system_prompt_key) if system_prompt_key else None
     system_prompt = (system_prompt_template or SOCIAL_MEDIA_EDIT_SYSTEM).format(**ctx)
+    system_prompt = system_prompt.rstrip() + f'\n{lang}'
 
     return _openai_chat(
         messages=[

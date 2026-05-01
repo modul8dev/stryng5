@@ -1,5 +1,7 @@
 import os
-from urllib.parse import urljoin, urlparse
+import base64
+import uuid
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests as http_requests
 from django.contrib.auth.decorators import login_required
@@ -26,8 +28,24 @@ def _accept_layer_response():
 # ── Brand scraping ──────────────────────────────────────────────────────────
 
 
+def _decode_svg_data_uri(data_uri):
+    """Return SVG bytes if data_uri is a data:image/svg+xml data URI, else None."""
+    if not data_uri or not data_uri.startswith('data:') or 'image/svg+xml' not in data_uri:
+        return None
+    try:
+        _, encoded = data_uri.split(',', 1)
+        if ';base64,' in data_uri:
+            return base64.b64decode(encoded)
+        else:
+            return unquote(encoded).encode('utf-8')
+    except Exception:
+        return None
+
+
 def _create_logo_image_group(user, project, logo_url, brand_name):
     """Create an ImageGroup containing the logo URL. Returns the group or None."""
+    from django.core.files.base import ContentFile
+
     try:
         group = ImageGroup.objects.create(
             user=user,
@@ -35,7 +53,14 @@ def _create_logo_image_group(user, project, logo_url, brand_name):
             title=f'{brand_name} Logo' if brand_name else 'Brand Logo',
             type=ImageGroup.GroupType.MANUAL,
         )
-        Image.objects.create(image_group=group, external_url=logo_url)
+        img = Image(image_group=group)
+        svg_bytes = _decode_svg_data_uri(logo_url)
+        if svg_bytes is not None:
+            filename = f'logo_{uuid.uuid4().hex}.svg'
+            img.image.save(filename, ContentFile(svg_bytes), save=True)
+        else:
+            img.external_url = logo_url
+            img.save()
         return group
     except Exception:
         return None
@@ -169,14 +194,18 @@ def _scrape_brand_data(user, project, url):
         return False, 'Could not retrieve page content for analysis.'
 
     # ── Phase 4: Structured brand extraction via OpenAI ──────────────────────
+    from django.conf.global_settings import LANGUAGES
+    language_name = dict(LANGUAGES).get(project.language or 'en', 'English')
+    from services.prompts.language import get_language_instruction
+    lang_instruction = get_language_instruction(language_name)
+
     try:
-        extracted = extract_brand_data(combined_markdown)
+        extracted = extract_brand_data(combined_markdown, language_instruction=lang_instruction)
     except Exception as exc:
         return False, f'Failed to extract brand data: {exc}'
 
     brand_name = extracted.get('name', '').strip()
     brand_summary = extracted.get('summary', '').strip()
-    brand_language = extracted.get('language', '').strip()
     brand_style_guide = extracted.get('style_guide', '').strip()
     brand_tone_of_voice = extracted.get('tone_of_voice', '').strip()
     brand_target_audience = extracted.get('target_audience', '').strip()
@@ -202,7 +231,6 @@ def _scrape_brand_data(user, project, url):
     brand.website_url = url
     brand.name = brand_name
     brand.summary = brand_summary
-    brand.language = brand_language
     brand.style_guide = brand_style_guide
     brand.tone_of_voice = brand_tone_of_voice
     brand.target_audience = brand_target_audience
@@ -297,34 +325,61 @@ def brand_scrape_modal(request):
 
 @login_required
 def brand_onboarding(request):
+    from urllib.parse import urlparse
+
+    from projects.forms import ProjectProvisioningForm
+    from projects.models import Project
+
+    project = request.project
+
     if request.method == 'POST':
-        form = ScrapeURLForm(request.POST)
+        form = ProjectProvisioningForm(request.POST)
         if form.is_valid():
-            url = form.cleaned_data['url']
-            brand, _ = Brand.objects.get_or_create(project=request.project, defaults={'user': request.user})
-            if brand.processing_status == Brand.ProcessingStatus.SCRAPING:
-                return render(request, 'brand/onboarding.html', {
-                    'form': form,
-                    'already_scraping': True,
-                })
-            Brand.objects.filter(pk=brand.pk).update(
-                processing_status=Brand.ProcessingStatus.SCRAPING,
-                scrape_error='',
-                website_url=url,
-            )
-            from django_q.tasks import async_task
-            from .tasks import scrape_brand_task
-            async_task(
-                scrape_brand_task, brand.pk, url,
-                user_id=request.user.id,
-                q_options={'task_name': 'scrape_brand'},
-            )
+            url = form.cleaned_data['domain']
+            language = form.cleaned_data['language']
+
+            # Update project language
+            project.language = language
+            # If project name is still the default, rename to domain
+            if project.name in ('My Project', project.owner.company_name or ''):
+                parsed = urlparse(url)
+                domain_name = parsed.netloc or parsed.path
+                domain_name = domain_name.removeprefix('www.')
+                project.name = domain_name
+            project.save()
+
+            # Start brand scrape task
+            brand, _ = Brand.objects.get_or_create(project=project, defaults={'user': request.user})
+            if brand.processing_status != Brand.ProcessingStatus.SCRAPING:
+                Brand.objects.filter(pk=brand.pk).update(
+                    processing_status=Brand.ProcessingStatus.SCRAPING,
+                    scrape_error='',
+                    website_url=url,
+                )
+                from django_q.tasks import async_task
+                from .tasks import scrape_brand_task
+                async_task(
+                    scrape_brand_task, brand.pk, url,
+                    user_id=request.user.id,
+                    q_options={'task_name': 'scrape_brand'},
+                )
+
+            # Start product import task
+            if not project.product_import_in_progress:
+                Project.objects.filter(pk=project.pk).update(product_import_in_progress=True)
+                from django_q.tasks import async_task
+                from media_library.tasks import import_products_task
+                async_task(
+                    import_products_task, project.pk, url,
+                    user_id=request.user.id,
+                    q_options={'task_name': 'import_products'},
+                )
+
             return render(request, 'brand/onboarding.html', {
                 'form': form,
-                'scraping_started': True,
-                'project_id': request.project.pk,
+                'provisioning_started': True,
             })
     else:
-        form = ScrapeURLForm()
+        form = ProjectProvisioningForm()
 
     return render(request, 'brand/onboarding.html', {'form': form})

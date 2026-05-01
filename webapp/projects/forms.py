@@ -1,6 +1,9 @@
 from django import forms
+from django.conf.global_settings import LANGUAGES
 
 from .models import Project
+
+SORTED_LANGUAGES = sorted(LANGUAGES, key=lambda x: x[1])
 
 
 class ProjectForm(forms.ModelForm):
@@ -25,3 +28,31 @@ class ProjectSettingsForm(forms.ModelForm):
             'enable_facebook': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
             'enable_instagram': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
         }
+
+
+class ProjectLanguageForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ['language']
+        widgets = {
+            'language': forms.Select(
+                choices=SORTED_LANGUAGES,
+                attrs={'class': 'select select-bordered w-full'},
+            ),
+        }
+
+
+class ProjectProvisioningForm(forms.Form):
+    domain = forms.URLField(
+        widget=forms.URLInput(attrs={
+            'class': 'input input-bordered w-full',
+            'placeholder': 'https://yourbrand.com',
+        }),
+        label='Website URL',
+    )
+    language = forms.ChoiceField(
+        choices=SORTED_LANGUAGES,
+        initial='en',
+        widget=forms.Select(attrs={'class': 'select select-bordered w-full'}),
+        label='Content Language',
+    )

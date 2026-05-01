@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.conf.global_settings import LANGUAGES
 from django.db import models
 
 
@@ -8,6 +9,11 @@ class Project(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='projects',
+    )
+    language = models.CharField(
+        max_length=10,
+        choices=LANGUAGES,
+        default='en',
     )
     enable_linkedin = models.BooleanField(default=True)
     enable_x = models.BooleanField(default=True)
