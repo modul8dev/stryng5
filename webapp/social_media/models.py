@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from core import fields
 
 
 PLATFORM_CHOICES = [
@@ -50,12 +51,12 @@ class SocialMediaPost(models.Model):
         on_delete=models.CASCADE,
         related_name='social_media_posts',
     )
-    title = models.CharField(max_length=200)
+    title = fields.TruncatingCharField(max_length=200)
     shared_text = models.TextField(blank=True)
-    topic = models.CharField(max_length=300, blank=True)
-    post_type = models.CharField(max_length=20, choices=POST_TYPE_CHOICES, blank=True)
+    topic = fields.TruncatingCharField(max_length=300, blank=True)
+    post_type = fields.TruncatingCharField(max_length=20, choices=POST_TYPE_CHOICES, blank=True)
     ai_instruction = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = fields.TruncatingCharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     scheduled_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -74,7 +75,7 @@ class SocialMediaPostPlatform(models.Model):
         on_delete=models.CASCADE,
         related_name='platforms',
     )
-    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    platform = fields.TruncatingCharField(max_length=20, choices=PLATFORM_CHOICES)
     is_enabled = models.BooleanField(default=True)
     use_shared_text = models.BooleanField(default=True)
     override_text = models.TextField(blank=True)

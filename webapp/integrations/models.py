@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from core import fields
 
 
 class IntegrationConnection(models.Model):
@@ -28,19 +29,19 @@ class IntegrationConnection(models.Model):
         on_delete=models.CASCADE,
         related_name='integration_connections',
     )
-    provider = models.CharField(max_length=50)
-    provider_category = models.CharField(
+    provider = fields.TruncatingCharField(max_length=50)
+    provider_category = fields.TruncatingCharField(
         max_length=50,
         choices=ProviderCategory.choices,
         default=ProviderCategory.OTHER,
     )
-    external_account_id = models.CharField(max_length=255)
-    external_account_name = models.CharField(max_length=255, blank=True, default='')
+    external_account_id = fields.TruncatingCharField(max_length=255)
+    external_account_name = fields.TruncatingCharField(max_length=255, blank=True, default='')
     access_token = models.TextField()
     refresh_token = models.TextField(blank=True, default='')
     token_expires_at = models.DateTimeField(null=True, blank=True)
     scopes = models.TextField(blank=True, default='')
-    status = models.CharField(
+    status = fields.TruncatingCharField(
         max_length=20,
         choices=ConnectionStatus.choices,
         default=ConnectionStatus.ACTIVE,

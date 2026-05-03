@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from core import fields
 
 
 class Brand(models.Model):
@@ -14,15 +15,15 @@ class Brand(models.Model):
         related_name='brand',
     )
     website_url = models.URLField(blank=True)
-    name = models.CharField(max_length=255, blank=True)
+    name = fields.TruncatingCharField(max_length=255, blank=True)
     summary = models.TextField(blank=True)
-    language = models.CharField(max_length=10, blank=True)
+    language = fields.TruncatingCharField(max_length=10, blank=True)
     style_guide = models.TextField(blank=True)
     tone_of_voice = models.TextField(blank=True)
     target_audience = models.TextField(blank=True)
     fonts = models.TextField(blank=True)
-    primary_color = models.CharField(max_length=7, blank=True)
-    secondary_color = models.CharField(max_length=7, blank=True)
+    primary_color = fields.TruncatingCharField(max_length=7, blank=True)
+    secondary_color = fields.TruncatingCharField(max_length=7, blank=True)
     logo = models.ForeignKey(
         'media_library.MediaGroup',
         null=True,
@@ -35,7 +36,7 @@ class Brand(models.Model):
         SCRAPING = 'scraping', 'Scraping'
         ERROR = 'error', 'Error'
 
-    processing_status = models.CharField(
+    processing_status = fields.TruncatingCharField(
         max_length=20,
         choices=ProcessingStatus.choices,
         default=ProcessingStatus.IDLE,

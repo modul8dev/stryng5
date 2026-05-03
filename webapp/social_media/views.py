@@ -117,8 +117,9 @@ def post_create(request):
 
     if request.method == 'POST':
         form = SocialMediaPostForm(request.POST)
+        initial_platforms = [{'platform': p} for p in enabled_platforms]
         PlatformFormSet = _make_platform_formset(extra=len(enabled_platforms))
-        platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost())
+        platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost(), initial=initial_platforms)
         media_formset = SharedMediaFormSet(request.POST, prefix='media', instance=SocialMediaPost())
         if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
             post = form.save(commit=False)

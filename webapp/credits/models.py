@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from core import fields
 
 
 class CreditGrant(models.Model):
@@ -15,8 +16,8 @@ class CreditGrant(models.Model):
         related_name='credit_grants',
     )
     amount = models.PositiveIntegerField()
-    source = models.CharField(max_length=20, choices=Source.choices)
-    stripe_invoice_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    source = fields.TruncatingCharField(max_length=20, choices=Source.choices)
+    stripe_invoice_id = fields.TruncatingCharField(max_length=255, blank=True, default='', db_index=True)
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -46,7 +47,7 @@ class CreditSpend(models.Model):
         related_name='credit_spends',
     )
     amount = models.PositiveIntegerField()
-    description = models.CharField(max_length=255)
+    description = fields.TruncatingCharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from core import fields
 
 
 class CustomUserManager(BaseUserManager):
@@ -21,9 +22,9 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractUser):
     username = None
     email = models.EmailField('email address', unique=True)
-    company_name = models.CharField(max_length=255, blank=True, default='')
-    stripe_customer_id = models.CharField(max_length=255, blank=True, default='')
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, default='')
+    company_name = fields.TruncatingCharField(max_length=255, blank=True, default='')
+    stripe_customer_id = fields.TruncatingCharField(max_length=255, blank=True, default='')
+    stripe_subscription_id = fields.TruncatingCharField(max_length=255, blank=True, default='')
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

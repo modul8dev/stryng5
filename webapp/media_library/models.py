@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from core import fields
 
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.wmv'}
 
@@ -29,10 +30,10 @@ class MediaGroup(models.Model):
         on_delete=models.CASCADE,
         related_name='media_groups',
     )
-    title = models.CharField(max_length=200)
+    title = fields.TruncatingCharField(max_length=200)
     description = models.TextField(blank=True)
     source_url = models.URLField(blank=True, null=True)
-    type = models.CharField(
+    type = fields.TruncatingCharField(
         max_length=20,
         choices=GroupType.choices,
         default=GroupType.MANUAL,
@@ -63,12 +64,12 @@ class Media(models.Model):
     )
     file = models.FileField(upload_to='media_library/%Y/%m/', blank=True, null=True)
     external_url = models.URLField(blank=True)
-    media_type = models.CharField(
+    media_type = fields.TruncatingCharField(
         max_length=10,
         choices=MediaType.choices,
         default=MediaType.IMAGE,
     )
-    source_type = models.CharField(
+    source_type = fields.TruncatingCharField(
         max_length=20,
         choices=SourceType.choices,
         default=SourceType.UPLOADED,

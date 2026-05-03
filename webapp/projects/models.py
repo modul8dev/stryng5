@@ -1,16 +1,17 @@
 from django.conf import settings
 from django.conf.global_settings import LANGUAGES
 from django.db import models
+from core import fields
 
 
 class Project(models.Model):
-    name = models.CharField(max_length=255)
+    name = fields.TruncatingCharField(max_length=255)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='projects',
     )
-    language = models.CharField(
+    language = fields.TruncatingCharField(
         max_length=10,
         choices=LANGUAGES,
         default='en',
