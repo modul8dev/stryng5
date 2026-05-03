@@ -63,7 +63,7 @@ class Media(models.Model):
         related_name='media_items',
     )
     file = models.FileField(upload_to='media_library/%Y/%m/', blank=True, null=True)
-    external_url = models.URLField(blank=True)
+    external_url = models.URLField(blank=True, max_length=2000)
     media_type = fields.TruncatingCharField(
         max_length=10,
         choices=MediaType.choices,
