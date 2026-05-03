@@ -103,23 +103,6 @@ def media_group_delete(request, pk):
     return response
 
 
-@login_required
-def add_url_media(request):
-    error = None
-    url = ''
-    if request.method == 'POST':
-        url = request.POST.get('url', '').strip()
-        validate = URLValidator()
-        try:
-            validate(url)
-            response = HttpResponse(status=204)
-            response['X-Up-Accept-Layer'] = json.dumps({'url': url})
-            return response
-        except ValidationError:
-            error = 'Please enter a valid media URL.'
-    return render(request, 'media_library/url_media_modal.html', {'error': error, 'url': url})
-
-
 def _is_shopify(base_url):
     """Return True if base_url responds like a Shopify store."""
     graphql_url = f'{base_url}/api/2026-01/graphql.json'

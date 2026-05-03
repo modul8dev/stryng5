@@ -7,7 +7,6 @@ app_name = 'media_library'
 urlpatterns = [
     path('create/', views.media_group_create, name='media_group_create'),
     path('create/', views.media_group_create, name='media_group_create'),
-    path('add-url-media/', views.add_url_media, name='add_url_media'),
     path('import-products/', views.products_import, name='products_import'),
     path('import-url/', views.url_import, name='url_import'),
     path('media-editor/', views.media_editor_modal, name='media_editor_modal'),
