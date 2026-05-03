@@ -80,11 +80,16 @@ def media_group_edit(request, pk):
     else:
         form = MediaGroupForm(instance=group)
         formset = MediaFormSet(instance=group)
+    generated_pks = set(
+        group.media_items.filter(source_type=Media.SourceType.GENERATED).values_list('pk', flat=True)
+    )
     return render(request, 'media_library/media_group_form.html', {
         'form': form,
         'formset': formset,
         'group': group,
         'is_edit': True,
+        'generated_pks': generated_pks,
+        'has_generated_media': bool(generated_pks),
     })
 
 

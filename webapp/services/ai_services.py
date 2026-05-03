@@ -315,7 +315,7 @@ def generate_post_media(brand, topic, post_type, seed_media, user, project=None)
             user=user,
             project=project,
             title='AI Generated Media',
-            type=MediaGroup.GroupType.MANUAL,
+            type=MediaGroup.GroupType.GENERATED,
         )
 
     ext = 'png' if 'png' in mime_type else 'jpg'

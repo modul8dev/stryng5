@@ -83,8 +83,10 @@
             </div>
             {% endif %}
 
+            {# ── Regular (non-generated) media ── #}
             <div id="formset-container" class="flex flex-wrap gap-4 mb-4">
                 {% for media_form in formset %}
+                {% if not media_form.instance.pk or media_form.instance.pk not in generated_pks %}
                 <div class="media-row relative w-32 h-32 sm:w-36 sm:h-36 flex-shrink-0" data-index="{{ forloop.counter0 }}">
                     <div class="media-preview w-full h-full rounded-lg overflow-hidden bg-base-300 flex items-center justify-center">
                         {% if media_form.instance.pk and media_form.instance.url %}
@@ -123,8 +125,52 @@
                     </button>
                     {% endif %}
                 </div>
+                {% endif %}
                 {% endfor %}
             </div>
+
+            {# ── AI Generated media section (separate row) ── #}
+            {% if has_generated_media %}
+            <div class="mt-4 mb-2">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-base-content/50">AI Generated</span>
+                    <div class="flex-1 h-px bg-base-300"></div>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                        </svg>
+                        Generated
+                    </span>
+                </div>
+                <div id="generated-media-container" class="flex flex-wrap gap-4 p-3 rounded-xl bg-violet-50/60 border border-violet-100">
+                    {% for media_form in formset %}
+                    {% if media_form.instance.pk and media_form.instance.pk in generated_pks %}
+                    <div class="media-row relative w-32 h-32 sm:w-36 sm:h-36 flex-shrink-0" data-index="{{ forloop.counter0 }}">
+                        <div class="media-preview w-full h-full rounded-lg overflow-hidden bg-violet-100 flex items-center justify-center ring-2 ring-violet-200">
+                            {% if media_form.instance.url %}
+                            <preview-media src="{{ media_form.instance.url }}"
+                                 alt="Generated preview"
+                                 class="w-full h-full object-cover"
+                                 loading="lazy">
+                            </preview-media>
+                            {% endif %}
+                        </div>
+                        {# Hidden fields (id, etc.) #}
+                        {% for hidden in media_form.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+                        <div class="hidden">{{ media_form.file }}</div>
+                        <label class="btn btn-circle btn-xs btn-error delete-toggle absolute -top-2 -right-2 cursor-pointer"
+                               title="Mark for deletion">
+                            {{ media_form.DELETE }}
+                            <span class="delete-label">✕</span>
+                        </label>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <div class="flex gap-2 mb-2">
                 <button type="button" id="add-media" class="btn btn-sm btn-outline btn-accent">

@@ -218,6 +218,33 @@ up.compiler('#formset-container', function (container) {
 
 });
 
+up.compiler('#generated-media-container', function (container) {
+  /* ── Hide the raw checkboxes inside delete-toggle labels ── */
+  container.querySelectorAll('.delete-toggle input[type="checkbox"]').forEach(function (cb) {
+    cb.style.position = 'absolute';
+    cb.style.opacity = '0';
+    cb.style.width = '0';
+    cb.style.height = '0';
+  });
+
+  /* ── Style delete-toggle on change ── */
+  container.addEventListener('change', function (e) {
+    var checkbox = e.target;
+    if (checkbox.type !== 'checkbox') return;
+    var label = checkbox.closest('.delete-toggle');
+    if (!label) return;
+    var row = checkbox.closest('.media-row');
+    if (!row) return;
+    if (checkbox.checked) {
+      row.classList.add('opacity-40');
+      label.querySelector('.delete-label').textContent = '↺';
+    } else {
+      row.classList.remove('opacity-40');
+      label.querySelector('.delete-label').textContent = '✕';
+    }
+  });
+});
+
 /* ── Social Media Post Composer ── */
 
 document.addEventListener('alpine:init', () => {

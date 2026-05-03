@@ -35,7 +35,7 @@ def generate_inspiration_task(project_id, user_id, cache_key):
         if brand and product_groups:
             selected = random.sample(product_groups, min(6, len(product_groups)))
             for group in selected:
-                media = list(group.media_items.all())
+                media = list(group.media_items.filter(source_type='manual').all())
                 seed_media = media[:2]
                 try:
                     topics = suggest_topic(brand, seed_media)
