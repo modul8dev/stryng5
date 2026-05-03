@@ -186,7 +186,7 @@ def _import_shopify_products(user, base_url, project=None):
             img_src = img_data.get('src', '')
             if not img_src:
                 continue
-            Media.objects.create(media_group=group, external_url=img_src)
+            Media.objects.create(media_group=group, external_url=img_src, source_type=Media.SourceType.IMPORTED)
 
     return True, None
 
@@ -263,7 +263,7 @@ def _import_woocommerce_products(user, base_url, project=None):
         for img_data in product.get('media', []):
             img_src = img_data.get('src', '')
             if img_src:
-                Media.objects.create(media_group=group, external_url=img_src)
+                Media.objects.create(media_group=group, external_url=img_src, source_type=Media.SourceType.IMPORTED)
 
     return True, None
 
@@ -334,7 +334,7 @@ def _import_domain_with_crawl(user, base_url, project=None):
             type=MediaGroup.GroupType.PRODUCT,
         )
         for img_url in media_urls:
-            Media.objects.create(media_group=group, external_url=img_url)
+            Media.objects.create(media_group=group, external_url=img_url, source_type=Media.SourceType.IMPORTED)
         created += 1
 
     if created == 0:
@@ -421,7 +421,7 @@ class _ImgSrcParser(HTMLParser):
 
 def _import_url_media(user, page_url, project=None):
     """
-    Scrape a URL with Firecrawl and create a manual MediaGroup with all found media items.
+    Scrape a URL with Firecrawl and create an imported MediaGroup with all found media items.
     Returns (success: bool, error: str | None).
     """
     api_key = os.environ.get('FIRECRAWL_API_KEY', '')
@@ -472,7 +472,7 @@ def _import_url_media(user, page_url, project=None):
         type=MediaGroup.GroupType.PRODUCT,
     )
     for url in media_urls:
-        Media.objects.create(media_group=group, external_url=url)
+        Media.objects.create(media_group=group, external_url=url, source_type=Media.SourceType.IMPORTED)
 
     return True, None
 

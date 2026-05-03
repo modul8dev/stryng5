@@ -50,7 +50,7 @@ def _create_logo_media_group(user, project, logo_url, brand_name):
             user=user,
             project=project,
             title=f'{brand_name} Logo' if brand_name else 'Brand Logo',
-            type=MediaGroup.GroupType.MANUAL,
+            type=MediaGroup.GroupType.IMPORTED,
         )
         img = Media(media_group=group)
         svg_bytes = _decode_svg_data_uri(logo_url)

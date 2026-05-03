@@ -52,8 +52,9 @@ class Media(models.Model):
         VIDEO = 'video', 'Video'
 
     class SourceType(models.TextChoices):
-        MANUAL = 'manual', 'Manual'
-        GENERATED = 'generated', 'Generated'
+        GENERATED = 'generated', 'AI Generated'
+        IMPORTED = 'imported', 'Imported'
+        UPLOADED = 'uploaded', 'Uploaded'
 
     media_group = models.ForeignKey(
         MediaGroup,
@@ -70,7 +71,7 @@ class Media(models.Model):
     source_type = models.CharField(
         max_length=20,
         choices=SourceType.choices,
-        default=SourceType.MANUAL,
+        default=SourceType.UPLOADED,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
