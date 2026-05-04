@@ -12,9 +12,9 @@ urlpatterns = [
     path('<int:pk>/publish/', views.post_publish, name='post_publish'),
     path('<int:pk>/publish-info/', views.post_publish_info, name='post_publish_info'),
     path('<int:pk>/publish-panel/', views.post_publish_panel, name='post_publish_panel'),
+    path('<int:pk>/card/', views.post_card, name='post_card'),
     path('<int:pk>/schedule/', views.post_schedule, name='post_schedule'),
     path('<int:pk>/unschedule/', views.post_unschedule, name='post_unschedule'),
     path('ai/suggest-topic/', views.ai_suggest_topic, name='ai_suggest_topic'),
-    path('ai/generate/', views.ai_generate, name='ai_generate'),
     path('ai/edit-text/', views.ai_edit_text, name='ai_edit_text'),
 ]

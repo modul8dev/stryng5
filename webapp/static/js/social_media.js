@@ -32,6 +32,7 @@ document.addEventListener('alpine:init', () => {
     generationStep: '',
     suggestingTopic: false,
     topicSuggestions: [],
+    _generationSseCleanup: null,
 
     // ── Preview carousel state ────────────────────────────────────────────
     carouselIndex: 0,
@@ -62,14 +63,25 @@ document.addEventListener('alpine:init', () => {
       this.postStatus = this.$el.dataset.postStatus || '';
       this.scheduledAt = this.$el.dataset.scheduledAt || '';
       this.unscheduleUrl = this.$el.dataset.unscheduleUrl || null;
+      this._subscribeGenerationSSE();
 
-      // Listen for status changes emitted by the publish panel
-      this._statusChangedHandler = (event) => {
-        this.postStatus = event.status || '';
-        this.scheduledAt = event.scheduledAt || '';
-        up.emit('social_media:changed');
+      // If post is currently generating, resume SSE listener
+      const processingStatus = this.$el.dataset.processingStatus || '';
+      if (processingStatus === 'generating') {
+        this.generating = true;
+        this.generationStep = 'Generating your post...';
+      }
+
+      // Listen for post-changed SSE to keep the status badge in sync
+      this._postChangedHandler = (e) => {
+        if (e.detail && e.detail.post_id == this.postId) {
+          this.postStatus = e.detail.status || this.postStatus;
+          if (e.detail.scheduled_at !== undefined) {
+            this.scheduledAt = e.detail.scheduled_at || '';
+          }
+        }
       };
-      document.addEventListener('social_media:status_changed', this._statusChangedHandler);
+      document.addEventListener('post-changed', this._postChangedHandler);
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
 
@@ -191,7 +203,7 @@ document.addEventListener('alpine:init', () => {
 
     destroy() {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
-      document.removeEventListener('social_media:status_changed', this._statusChangedHandler);
+      document.removeEventListener('post-changed', this._postChangedHandler);
       const postForm = document.getElementById('post-form');
       if (postForm && this._dirtyHandler) {
         postForm.removeEventListener('input', this._dirtyHandler);
@@ -386,62 +398,76 @@ document.addEventListener('alpine:init', () => {
     async generatePost() {
       if (this.generating) return;
       this.generating = true;
-      this.generationStep = 'Generating…';
+      this.generationStep = 'Generating your post...';
       try {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-
-        this.generationStep = 'Generating your post...';
-
-        // Collect all enabled platforms from hidden platform inputs
-        const platforms = [];
-        this.$el.querySelectorAll('[name$="-platform"]').forEach(input => {
-          if (input.value) platforms.push(input.value);
-        });
-
-        const resp = await fetch('/social-media/ai/generate/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken,
-          },
-          body: JSON.stringify({
-            topic: this.topic,
-            post_type: this.postType,
-            seed_media_ids: this.seedMedia.map(i => i.media),
-            platforms: platforms,
-          }),
-        });
-        const data = await resp.json();
-
-        if (data.error) {
-          console.error('Generation error:', data.error);
-          return;
-        }
-
-        // Populate text
-        if (data.text) {
-          this.sharedText = data.text;
-        }
-
-        // Add generated media to shared media
-        if (data.media) {
-          this.sharedMedia = [
-            ...this.sharedMedia,
-            { mediaId: this._nextTempId(), media: data.media.id, url: data.media.url },
-          ];
-          this.syncSharedMediaFormset();
-          this._resetCarousel();
-        }
-
-        // Switch to editor mode
-        this.mode = 'editor';
-        this.isDirty = true;
+        await this.savePost(false, 'generate');
       } catch (e) {
         console.error('Failed to generate post:', e);
-      } finally {
         this.generating = false;
         this.generationStep = '';
       }
+    },
+
+    _subscribeGenerationSSE() {
+      if (!this.postId) return;
+      if (this._generationSseCleanup) this._generationSseCleanup();
+
+      const postId = this.postId;
+      let timer = null;
+
+      const handler = (e) => {
+        if (e.detail && e.detail.post_id == postId) {
+          cleanup();
+          this._onGenerationDone(e.detail);
+        }
+      };
+
+      const cleanup = () => {
+        document.removeEventListener('generation-done', handler);
+        if (timer) { clearTimeout(timer); timer = null; }
+        this._generationSseCleanup = null;
+      };
+
+      document.addEventListener('generation-done', handler);
+      this._generationSseCleanup = cleanup;
+
+      // Safety timeout: give up after 5 minutes
+      timer = setTimeout(() => {
+        cleanup();
+        this.generating = false;
+        this.generationStep = '';
+      }, 5 * 60 * 1000);
+    },
+
+    _onGenerationDone(data) {
+      this.generating = false;
+      this.generationStep = '';
+      if (data.processing_status === 'completed') {
+        if (data.shared_text) {
+          this.sharedText = data.shared_text;
+          const ta = this.$root.querySelector('#id_shared_text');
+          if (ta) ta.value = data.shared_text;
+        }
+        if (data.media && data.media.length > 0) {
+          this.sharedMedia = [];
+          for (const m of data.media) {
+            this.sharedMedia.push({
+              mediaId: this._nextTempId(),
+              media: m.id,
+              url: m.url,
+              is_video: m.is_video,
+            });
+          }
+          this.syncSharedMediaFormset();
+          this._resetCarousel();
+        }
+        this.mode = 'editor';
+        this.isDirty = false;
+      }
+    },
+
+    closeWhileGenerating() {
+      up.layer.dismiss();
     },
 
     // ── Textarea helpers ──────────────────────────────────────────────────
@@ -686,7 +712,7 @@ document.addEventListener('alpine:init', () => {
 
     async savePost(closeOnSuccess = true, action = 'draft') {
       const form = document.getElementById('post-form');
-      if (!form) return;
+      if (!form) return false;
 
       this.saving = true;
       try {
@@ -698,6 +724,7 @@ document.addEventListener('alpine:init', () => {
         if (closeOnSuccess) {
           up.layer.accept();
         }
+        return true;
       } finally {
         this.saving = false;
       }
@@ -754,6 +781,37 @@ document.addEventListener('alpine:init', () => {
       this.dragSourcePlatform = null;
       this.dragOverIndex = null;
       this.dragOverType = null;
+    },
+
+  }));
+
+  // ── Post List ────────────────────────────────────────────────────────────
+
+  Alpine.data('postList', () => ({
+
+    init() {
+      this._handler = (e) => {
+        const postId = e.detail?.post_id;
+        if (!postId) return;
+        // When a modal is open, up.reload() defaults to looking for the target
+        // in the current (modal) layer. The card lives on root, so it's not found
+        // and the insertion is silently skipped (.post-list works because it has
+        // up-hungry which bypasses layer isolation). asCurrent() makes root the
+        // current layer so Unpoly finds the card element where it actually lives.
+        up.layer.root.asCurrent(() => {
+          const cardEl = document.getElementById(`post-card-${postId}`);
+          if (cardEl) {
+            up.reload(cardEl);
+          } else {
+            up.reload('.post-list');
+          }
+        });
+      };
+      document.addEventListener('post-changed', this._handler);
+    },
+
+    destroy() {
+      document.removeEventListener('post-changed', this._handler);
     },
 
   }));
@@ -860,8 +918,6 @@ document.addEventListener('alpine:init', () => {
           return;
         }
         this.postStatus = data.status;
-        // Notify editor of status change, then close only the publish panel
-        up.emit('social_media:status_changed', { status: data.status, scheduledAt: data.scheduled_at });
         up.layer.dismiss();
       } catch (e) {
         this.scheduleError = 'Failed to schedule. Please try again.';
@@ -882,7 +938,6 @@ document.addEventListener('alpine:init', () => {
         });
         const data = await resp.json();
         this.postStatus = data.status;
-        up.emit('social_media:status_changed', { status: 'draft', scheduledAt: '' });
         up.layer.dismiss();
       } catch (e) {
         console.error('Failed to unschedule:', e);
@@ -906,7 +961,6 @@ document.addEventListener('alpine:init', () => {
         const data = await resp.json();
         if (data.queued && this.postId) {
           this.postStatus = 'publishing';
-          up.emit('social_media:status_changed', { status: 'publishing', scheduledAt: '' });
           this._subscribeSSE();
         } else {
           this.publishing = false;
@@ -954,8 +1008,6 @@ document.addEventListener('alpine:init', () => {
       Object.entries(data.failures || {}).forEach(([p, err]) => results.push({ platform: p, success: false, error: err }));
       this.liveResults = results;
       this.view = 'results';
-      up.emit('social_media:status_changed', { status: data.status, scheduledAt: '' });
-      up.emit('social_media:changed');
     },
 
   }));

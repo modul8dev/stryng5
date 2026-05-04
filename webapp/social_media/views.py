@@ -27,7 +27,7 @@ from .models import (
     SocialMediaPlatformMedia,
 )
 from .publisher import publish_post
-from .tasks import publish_post_task
+from .tasks import publish_post_task, generate_post_task
 
 
 def _accept_layer_response():
@@ -117,9 +117,8 @@ def post_create(request):
 
     if request.method == 'POST':
         form = SocialMediaPostForm(request.POST)
-        initial_platforms = [{'platform': p} for p in enabled_platforms]
         PlatformFormSet = _make_platform_formset(extra=len(enabled_platforms))
-        platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost(), initial=initial_platforms)
+        platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost())
         media_formset = SharedMediaFormSet(request.POST, prefix='media', instance=SocialMediaPost())
         if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
             post = form.save(commit=False)
@@ -135,7 +134,11 @@ def post_create(request):
             media_formset.save()
             _save_platform_override_media(request, post)
             _save_seed_media(request, post)
-            return _accept_layer_response()
+            if request.POST.get('action') == 'generate':
+                err = _enqueue_generation(request, post)
+                if err:
+                    return err
+            return HttpResponse(status=200)
     else:
         form = SocialMediaPostForm()
         initial_platforms = [{'platform': p} for p in enabled_platforms]
@@ -207,6 +210,10 @@ def post_edit(request, pk):
             media_formset.save()
             _save_platform_override_media(request, post)
             _save_seed_media(request, post)
+            if request.POST.get('action') == 'generate':
+                err = _enqueue_generation(request, post)
+                if err:
+                    return err
             return _accept_layer_response()
     else:
         form = SocialMediaPostForm(instance=post)
@@ -272,6 +279,38 @@ def _get_project_brand(project):
         return None
 
 
+def _enqueue_generation(request, post):
+    """Validate credits, mark the post as generating and enqueue the task.
+    Returns a JsonResponse if an error occurs, otherwise None."""
+    brand = _get_project_brand(request.project)
+    if not brand:
+        return JsonResponse({'error': 'Brand not configured'})
+
+    if available_credits(request.user) < IMAGE_GENERATION_COST:
+        return JsonResponse({
+            'error': 'Insufficient credits',
+            'credits_required': IMAGE_GENERATION_COST,
+        })
+
+    post.processing_status = 'generating'
+    post.save(update_fields=['processing_status'])
+
+    platforms = list(post.platforms.values_list('platform', flat=True))
+    seed_media_ids = list(post.seed_media.order_by('sort_order').values_list('media_id', flat=True))
+
+    from django_q.tasks import async_task
+    async_task(
+        'social_media.tasks.generate_post_task',
+        post.pk,
+        brand.pk,
+        post.topic,
+        post.post_type,
+        seed_media_ids,
+        platforms,
+    )
+    return None
+
+
 def _parse_json_body(request):
     try:
         return json.loads(request.body)
@@ -304,56 +343,6 @@ def ai_suggest_topic(request):
     except Exception:
         logger.exception('Failed to suggest topic')
         return JsonResponse({'error': 'Failed to suggest topic'}, status=500)
-
-
-@login_required
-@require_POST
-def ai_generate(request):
-    data = _parse_json_body(request)
-    if not data:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-
-    brand = _get_project_brand(request.project)
-    if not brand:
-        return JsonResponse({'error': 'Brand not configured'}, status=400)
-
-    topic = data.get('topic', '')
-    post_type = data.get('post_type', '')
-    platforms = data.get('platforms', [])
-    seed_media_ids = data.get('seed_media_ids', [])
-
-    seed_media = list(
-        Media.objects.filter(
-            id__in=seed_media_ids,
-            media_group__project=request.project,
-        )
-    ) if seed_media_ids else []
-
-    # Check credits before media generation
-    if available_credits(request.user) < IMAGE_GENERATION_COST:
-        return JsonResponse(
-            {'error': 'Insufficient credits', 'credits_required': IMAGE_GENERATION_COST},
-            status=402,
-        )
-
-    result = {}
-
-    try:
-        result['text'] = generate_post_text(brand, topic, post_type, seed_media, platforms)
-    except Exception:
-        logger.exception('Failed to generate post text')
-        return JsonResponse({'error': 'Failed to generate text'}, status=500)
-
-    try:
-        media = generate_post_media(brand, topic, post_type, seed_media, request.user, project=request.project)
-        if media:
-            spend_credits(request.user, IMAGE_GENERATION_COST, 'Post media generation')
-            result['media'] = {'id': media.id, 'url': media.url}
-    except Exception:
-        logger.exception('Failed to generate media (text was generated successfully)')
-        # Non-fatal: text was already generated
-
-    return JsonResponse(result)
 
 
 @login_required
@@ -459,3 +448,14 @@ def post_publish_panel(request, pk):
         'post': post,
         'platforms': platforms,
     })
+
+
+@login_required
+def post_card(request, pk):
+    """Render a single post card fragment (used for per-card SSE-triggered reload)."""
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    all_media = list(post.shared_media.select_related('media').all())
+    post.preview_media = all_media[:3]
+    post.extra_media_count = max(0, len(all_media) - 3)
+    return render(request, 'social_media/post_card.html', {'post': post})
+

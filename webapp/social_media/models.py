@@ -32,6 +32,13 @@ STATUS_CHOICES = [
     ('failed', 'Failed'),
 ]
 
+PROCESSING_STATUS_CHOICES = [
+    ('idle', 'Idle'),
+    ('generating', 'Generating'),
+    ('completed', 'Completed'),
+    ('error', 'Error'),
+]
+
 
 POST_TYPE_CHOICES = [
     ('product', 'Product'),
@@ -57,6 +64,9 @@ class SocialMediaPost(models.Model):
     post_type = fields.TruncatingCharField(max_length=20, choices=POST_TYPE_CHOICES, blank=True)
     ai_instruction = models.TextField(blank=True)
     status = fields.TruncatingCharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    processing_status = fields.TruncatingCharField(
+        max_length=20, choices=PROCESSING_STATUS_CHOICES, default='idle',
+    )
     scheduled_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -67,6 +77,20 @@ class SocialMediaPost(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        try:
+            from django_eventstream import send_event
+            send_event(f'user-{self.user_id}', 'message', {
+                'type': 'post-changed',
+                'post_id': self.pk,
+                'status': self.status,
+                'processing_status': self.processing_status,
+                'scheduled_at': self.scheduled_at.isoformat() if self.scheduled_at else '',
+            })
+        except Exception:
+            pass  # Never let SSE break saves
 
 
 class SocialMediaPostPlatform(models.Model):

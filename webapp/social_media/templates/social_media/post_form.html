@@ -5,6 +5,7 @@
       data-publish-panel-url="{% url 'social_media:post_publish_panel' post.pk %}"
       data-post-id="{{ post.pk }}"
       data-post-status="{{ post.status }}"
+      data-processing-status="{{ post.processing_status }}"
       data-scheduled-at="{{ post.scheduled_at|date:'c'|default:'' }}"
       data-unschedule-url="{% url 'social_media:post_unschedule' post.pk %}"
       {% endif %}>
@@ -81,7 +82,7 @@
         </svg>
         <div class="text-center">
             <p class="text-base font-semibold text-zinc-800" x-text="generationStep">Generating…</p>
-            <p class="mt-1 text-sm text-zinc-500">This may take a few moments…</p>
+            <p class="mt-1 text-sm text-zinc-500">This may take a few moments. You can close this and come back later.</p>
         </div>
         <div class="flex w-52 flex-col gap-4">
             <div class="skeleton h-32 w-full"></div>
@@ -89,6 +90,11 @@
             <div class="skeleton h-4 w-full"></div>
             <div class="skeleton h-4 w-full"></div>
         </div>
+        <button type="button"
+                @click="closeWhileGenerating()"
+                class="mt-4 inline-flex items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+            Close &amp; continue in background
+        </button>
     </div>
 
     {# ── Body ── #}

@@ -337,7 +337,10 @@ def generate_post_media(brand, topic, post_type, seed_media, user, project=None)
         )
 
     ext = 'png' if 'png' in mime_type else 'jpg'
-    media_obj = Media(media_group=group)
+    media_obj = Media(
+        media_group=group,
+        source_type=Media.SourceType.GENERATED,
+        )
     media_obj.file.save(f'ai_generated.{ext}', ContentFile(media_data), save=True)
     return media_obj
 
