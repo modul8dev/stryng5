@@ -5,6 +5,20 @@ from core import fields
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.wmv'}
 
 
+def media_upload_to(instance, filename):
+    """Upload to media/company/<company_uuid>/<filename>.
+
+    The S3Storage location='media' prefix is applied by the storage backend,
+    so this callable only needs to return company/<uuid>/<filename>.
+    When using local storage the file lands at MEDIA_ROOT/company/<uuid>/<filename>.
+    """
+    try:
+        company_uuid = instance.media_group.user.company.uuid
+    except AttributeError:
+        company_uuid = 'unknown'
+    return f'company/{company_uuid}/{filename}'
+
+
 def _url_is_video(url):
     if not url:
         return False
@@ -62,7 +76,7 @@ class Media(models.Model):
         on_delete=models.CASCADE,
         related_name='media_items',
     )
-    file = models.FileField(upload_to='media_library/%Y/%m/', blank=True, null=True)
+    file = models.FileField(upload_to=media_upload_to, blank=True, null=True)
     external_url = models.URLField(blank=True, max_length=2000)
     media_type = fields.TruncatingCharField(
         max_length=10,

@@ -60,7 +60,8 @@ class MediaForm(forms.ModelForm):
 
     def clean_file(self):
         f = self.cleaned_data.get('file')
-        if f and hasattr(f, 'size'):
+        from django.core.files.uploadedfile import UploadedFile
+        if isinstance(f, UploadedFile):
             validate_media_file_size(f)
         return f
 
