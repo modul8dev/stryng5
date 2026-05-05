@@ -1,0 +1,29 @@
+{% extends "account/base_auth.html" %}
+
+{% block card %}
+<div class="flex flex-col items-center text-center">
+    <!-- Email icon -->
+    <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50">
+        <svg class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+        </svg>
+    </div>
+
+    <h2 class="mb-2 text-lg font-semibold text-zinc-900">Check your email</h2>
+    <p class="text-sm text-zinc-500 leading-relaxed">
+        We've sent a verification link to your email address. Please click the link to activate your account.
+    </p>
+
+    <div class="divider my-5"></div>
+
+    <p class="text-xs text-zinc-400 leading-relaxed">
+        Didn't receive the email? Check your spam folder or
+        <a href="{% url 'account_login' %}" class="font-medium text-indigo-600 hover:text-indigo-500">try signing in</a>
+        to resend it.
+    </p>
+</div>
+{% endblock %}
+
+{% block below_card %}
+<a href="{% url 'account_login' %}" class="font-medium text-indigo-600 hover:text-indigo-500">← Back to sign in</a>
+{% endblock %}

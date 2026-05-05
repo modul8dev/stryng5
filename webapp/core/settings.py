@@ -74,6 +74,8 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'anymail',
+    'mjml',
 ]
 
 SITE_ID = 1
@@ -220,7 +222,9 @@ ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = True
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
@@ -239,8 +243,24 @@ SOCIALACCOUNT_PROVIDERS = {
     },
 }
 
-# Email (console backend for development)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# ─── Email ────────────────────────────────────────────────────────────────────
+
+EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@stryng.io')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+ANYMAIL = {
+    'AMAZON_SES_CLIENT_PARAMS': {
+        'region_name': os.environ.get('AWS_SES_REGION_NAME', AWS_S3_REGION_NAME),
+        'aws_access_key_id': AWS_ACCESS_KEY_ID,
+        'aws_secret_access_key': AWS_SECRET_ACCESS_KEY,
+    },
+}
+
+# ─── MJML ─────────────────────────────────────────────────────────────────────
+MJML_BACKEND_MODE = 'cmd'
+MJML_EXEC_CMD = str(BASE_DIR.parent / 'bin' / 'mjml')
 
 # ─── Stripe ──────────────────────────────────────────────────────────────────
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')

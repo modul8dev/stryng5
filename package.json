@@ -14,6 +14,7 @@
   "dependencies": {
     "@tailwindcss/cli": "^4.1.5",
     "@tailwindcss/typography": "^0.5.19",
+    "mjml": "^4.15.3",
     "tailwindcss": "^4.1.5"
   },
   "devDependencies": {

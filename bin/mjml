@@ -1,0 +1,4 @@
+#!/bin/sh
+# Wrapper script to run MJML CLI while suppressing Node.js deprecation warnings
+# that django-mjml incorrectly treats as errors.
+NODE_OPTIONS="--no-deprecation" exec /workspace/node_modules/.bin/mjml "$@"

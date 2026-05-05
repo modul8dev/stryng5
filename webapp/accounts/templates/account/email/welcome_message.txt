@@ -1,0 +1,14 @@
+Hi {{ user_email }},
+
+Welcome to Stryng! We're excited to have you on board.
+
+Here's what you can do next:
+
+1. Set up your brand — add your website and let Stryng learn your brand voice and style.
+2. Build your media library — upload your product photos and creative assets.
+3. Create your first social post — generate on-brand content in seconds.
+
+Get started here:
+{{ dashboard_url }}
+
+The Stryng Team

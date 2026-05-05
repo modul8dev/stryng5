@@ -18,7 +18,9 @@ stripe==15.0.0
 openai-agents==0.13.4
 django-q2==1.9.0
 django-eventstream==5.3.3
-rediss==7.4.0
+redis==7.4.0
 psycopg2-binary==2.9.12
 django-storages[s3]==1.14.6
 django-cleanup==9.0.0
+django-anymail[amazon-ses]==15.0
+django-mjml==1.5

@@ -1,0 +1,56 @@
+{% extends "account/base_auth.html" %}
+{% load account %}
+
+{% block card %}
+<div class="flex flex-col items-center text-center">
+    {% if confirmation %}
+        {% if can_confirm %}
+        <!-- Success state: user can confirm -->
+        <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+            <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+        </div>
+
+        <h2 class="mb-2 text-lg font-semibold text-zinc-900">Confirm your email</h2>
+        <p class="mb-6 text-sm text-zinc-500 leading-relaxed">
+            Please confirm that <span class="font-medium text-zinc-700">{{ confirmation.email_address.email }}</span> is your email address.
+        </p>
+
+        <form method="post" action="{% url 'account_confirm_email' confirmation.key %}" class="w-full">
+            {% csrf_token %}
+            {{ redirect_field }}
+            <button type="submit" class="btn btn-primary btn-block rounded-lg text-sm">Confirm email address</button>
+        </form>
+        {% else %}
+        <!-- Error state: already confirmed by another account -->
+        <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
+            <svg class="h-8 w-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+        </div>
+
+        <h2 class="mb-2 text-lg font-semibold text-zinc-900">Unable to confirm</h2>
+        <p class="text-sm text-zinc-500 leading-relaxed">
+            This email address is already confirmed by a different account.
+        </p>
+        {% endif %}
+    {% else %}
+    <!-- Invalid/expired link -->
+    <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+        <svg class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+        </svg>
+    </div>
+
+    <h2 class="mb-2 text-lg font-semibold text-zinc-900">Invalid confirmation link</h2>
+    <p class="text-sm text-zinc-500 leading-relaxed">
+        This confirmation link is invalid or has expired. Please try signing in to request a new verification email.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block below_card %}
+<a href="{% url 'account_login' %}" class="font-medium text-indigo-600 hover:text-indigo-500">← Back to sign in</a>
+{% endblock %}
