@@ -6,6 +6,7 @@
 - Shared templates live in `webapp/templates/` (`base.html` + `includes/`), with app templates under `webapp/<app>/templates/<app>/`.
 - Frontend styling uses Tailwind + DaisyUI. Source CSS is `webapp/static/css/src/input.css`; generated CSS is `webapp/static/css/src/output.css`.
 - Project uses unpoly for frontend interactions; opening modals and updating fragments should use unpoly attributes on links and forms.
+- Project uses alpine.js for interactive frontend components. Each component should be defined in its own JS class in a separate JS file imported in the base template.
 
 ## Build And Test
 - Python dependencies (workspace root): `pip install -r requirements.txt`
