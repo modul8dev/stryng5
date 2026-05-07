@@ -23,5 +23,5 @@ python manage.py collectstatic --noinput --ignore input.css
 echo "==> Starting daphne on port 8100..."
 exec daphne core.asgi:application \
     --bind 0.0.0.0 \
-    --port 8100 \
+    --port 8000 \
     --access-log -
