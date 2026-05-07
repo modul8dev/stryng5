@@ -63,6 +63,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          strip_components: true
           source: ".env,deploy/nginx/nginx.conf"
           target: "~/repo/scp/"
 
@@ -83,14 +84,15 @@ jobs:
             echo "$GITHUB_SSH_KEY" > ~/.ssh/modul8_github_ssh_key
             chmod 600 ~/.ssh/modul8_github_ssh_key
 
-            export GIT_SSH_COMMAND="ssh -i ~/.ssh/modul8_github_ssh_key -o StrictHostKeyChecking=no"
-
             mkdir -p ~/repo
 
+            # Clone or pull the latest code
             if [ ! -d ~/repo/stryng5 ]; then
+              # Clone directly into the folder
               git clone git@github.com:modul8dev/stryng5.git ~/repo/stryng5
             else
-              cd ~/repo/stryng5 && git pull
+              # Pull updates
+              git -C ~/repo/stryng5 pull
             fi
 
             cd ~/repo/stryng5
