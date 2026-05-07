@@ -63,7 +63,6 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          strip_components: true
           source: ".env,deploy/nginx/nginx.conf"
           target: "~/repo/scp/"
 
@@ -98,7 +97,7 @@ jobs:
             cd ~/repo/stryng5
 
             # Put rendered files in place
-            mv ~/repo/scp/nginx.conf deploy/nginx/nginx.conf
+            mv ~/repo/scp/deploy/nginx/nginx.conf deploy/nginx/nginx.conf
             mv ~/repo/scp/.env .env
 
             # Pull latest images and (re)start services
