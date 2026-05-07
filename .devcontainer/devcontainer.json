@@ -35,8 +35,7 @@
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
-				"ms-python.vscode-pylance",
-				"openai.chatgpt"
+				"ms-python.vscode-pylance"
 			]
 		}
 	},

@@ -17,9 +17,7 @@ ensure_owned() {
 }
 
 if [ -d /home/vscode ]; then
-  ensure_owned /home/vscode/.codex
   ensure_owned /home/vscode/.config/Code/User/globalStorage
-  ensure_owned /home/vscode/.config/Code/User/globalStorage/openai.chatgpt
 fi
 
 exec "$@"

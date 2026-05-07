@@ -22,6 +22,26 @@ def _get_openai_client():
     return OpenAI(api_key=os.environ.get('OPENAI_API_KEY', ''))
 
 
+def _extract_message_text(message):
+    content = getattr(message, 'content', '')
+    if isinstance(content, str):
+        return content.strip()
+
+    if isinstance(content, list):
+        chunks = []
+        for part in content:
+            text = ''
+            if isinstance(part, dict):
+                text = part.get('text') or part.get('content') or ''
+            else:
+                text = getattr(part, 'text', '') or getattr(part, 'content', '') or ''
+            if text:
+                chunks.append(str(text))
+        return '\n'.join(chunks).strip()
+
+    return str(content or '').strip()
+
+
 def _openai_chat(messages, model=OpenAIModel.QUICK, **kwargs):
     """Send a chat request to OpenAI and return the response text."""
     client = _get_openai_client()

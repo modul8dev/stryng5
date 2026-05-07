@@ -15,9 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.conf import settings
-from django.conf.urls.static import static
+from django.contrib.auth.decorators import login_not_required
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve as static_serve
 
 from media_library import views as ml_views
 
@@ -37,4 +38,10 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [
+        re_path(
+            r'^media/(?P<path>.*)$',
+            login_not_required(static_serve),
+            {'document_root': settings.MEDIA_ROOT},
+        ),
+    ]

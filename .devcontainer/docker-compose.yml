@@ -7,8 +7,6 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspace:delegated
-      - openai-chatgpt:/home/vscode/.config/Code/User/globalStorage/openai.chatgpt
-      - codex-config:/home/vscode/.codex
     command: sleep infinity
     depends_on:
       - db
@@ -46,6 +44,4 @@ services:
       - "6379:6379"
 
 volumes:
-  openai-chatgpt:
-  codex-config:
   postgres-data:
