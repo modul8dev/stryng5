@@ -3,9 +3,9 @@ name: Deploy to EC2
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('[{0}] - {1}', github.event.inputs.environment, github.workflow) || format('[uat] - {0}', github.event.head_commit.message) }}
 
 on:
-  # push:
-  #   branches:
-  #     - main
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       environment:
@@ -44,7 +44,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          SECRET_NAME: ${{ env.AWS_SECRET_NAME }}
+          SECRET_NAME: ${{ vars.AWS_SECRET_NAME }}
           OUTPUT_PATH: '.env'
 
       - name: Install jinjanator
