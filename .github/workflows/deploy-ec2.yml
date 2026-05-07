@@ -102,5 +102,5 @@ jobs:
             mv ~/repo/scp/.env .env
 
             # Pull latest images and (re)start services
-            # docker compose pull
-            # docker compose up -d --remove-orphans
+            cd deploy
+            docker compose up -d --force-recreate stryng_app qcluster
