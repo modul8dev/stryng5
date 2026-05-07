@@ -72,9 +72,32 @@ jobs:
             ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:~/repo/scp/
 
       - name: Deploy on EC2
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+        uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_SSH_KEY: ${{ secrets.M8_GIHUB_SSH_KEY }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GITHUB_SSH_KEY
+          script: |
             set -euo pipefail
+
+            # Ensure GitHub SSH key is in place
+            mkdir -p ~/.ssh
+            echo "$GITHUB_SSH_KEY" > ~/.ssh/modul8_github_ssh_key
+            chmod 600 ~/.ssh/modul8_github_ssh_key
+
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/modul8_github_ssh_key -o StrictHostKeyChecking=no"
+
+            mkdir -p ~/repo
+
+            if [ ! -d ~/repo/stryng5 ]; then
+              git clone git@github.com:modul8dev/stryng5.git ~/repo/stryng5
+            else
+              cd ~/repo/stryng5 && git pull
+            fi
+
             cd ~/repo/stryng5
 
             # Put rendered files in place
@@ -84,4 +107,3 @@ jobs:
             # Pull latest images and (re)start services
             # docker compose pull
             # docker compose up -d --remove-orphans
-          ENDSSH
