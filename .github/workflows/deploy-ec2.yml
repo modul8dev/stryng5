@@ -64,7 +64,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: ".env,deploy/nginx/nginx.conf"
+          source: ".env,deploy/nginx/nginx.conf,deploy/docker-compose.yml"
           target: "~/repo/scp/"
 
       - name: Deploy on EC2
