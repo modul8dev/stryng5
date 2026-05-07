@@ -57,22 +57,23 @@ jobs:
         run: |
           jinjanate deploy/nginx/nginx.conf.j2 .env --format=env  -o deploy/nginx/nginx.conf
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
       - name: Copy files to EC2
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: ".env,deploy/nginx/nginx.conf"
-          target: "~/repo/scp"
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            .env \
+            deploy/nginx/nginx.conf \
+            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:~/repo/scp/
 
       - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
             set -euo pipefail
             cd ~/repo/stryng5
 
@@ -83,3 +84,4 @@ jobs:
             # Pull latest images and (re)start services
             # docker compose pull
             # docker compose up -d --remove-orphans
+          ENDSSH
