@@ -47,6 +47,9 @@ jobs:
           SECRET_NAME: ${{ vars.AWS_SECRET_NAME }}
           OUTPUT_PATH: '.env'
 
+      - name: List files for debugging
+        run: ls -la && cat .env
+
       - name: Install jinjanator
         run: pip install jinjanator
 
