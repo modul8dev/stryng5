@@ -17,7 +17,7 @@ env/
 # Django
 
 /webapp/staticfiles/
-.env
+.env*
 media/
 \*.log
 \*.pot

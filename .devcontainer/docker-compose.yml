@@ -10,14 +10,6 @@ services:
       - openai-chatgpt:/home/vscode/.config/Code/User/globalStorage/openai.chatgpt
       - codex-config:/home/vscode/.codex
     command: sleep infinity
-    environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=stryng
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
       - db
       - redis
@@ -30,14 +22,6 @@ services:
       - ..:/workspace:delegated
     working_dir: /workspace/webapp
     command: /workspace/.venv/bin/python manage.py qcluster
-    environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=stryng
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
       - db
       - redis

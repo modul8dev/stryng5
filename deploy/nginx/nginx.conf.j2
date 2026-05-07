@@ -1,0 +1,45 @@
+Placeholder for nginx configuration file from gihub actions deploy workflow. server {
+    listen                  443 ssl;
+    listen                  [::]:443 ssl;
+    server_name             {{APP_DOMAIN}};
+    ssl_certificate         /root/ssl/cert.pem;
+    ssl_certificate_key     /root/ssl/key.pem;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass "http://stryng_app:8100/";
+        proxy_http_version 1.1;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+	error_page 502 503 504 /index.html;
+
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    location = /index.html {
+        root /etc/nginx/html/maintenance;
+    }
+
+    location = /under_maintenance.png {
+        alias /etc/nginx/html/maintenance/under_maintenance.png;
+    }
+
+    location /admin {
+        deny all;
+	    return 404;
+    }
+
+}
+
+server {
+    listen                  80;
+    listen                  [::]:80;
+    server_name             {{APP_DOMAIN}};
+    return                  301 https://$server_name$request_uri;
+}
