@@ -78,7 +78,7 @@ jobs:
             cd ~/repo/stryng5
 
             # Put rendered files in place
-            mv ~/repo/scp/deploy/nginx/nginx.conf docker/nginx/nginx.conf
+            mv ~/repo/scp/nginx.conf docker/nginx/nginx.conf
             mv ~/repo/scp/.env .env
 
             # Pull latest images and (re)start services
