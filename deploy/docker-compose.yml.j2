@@ -61,8 +61,8 @@ services:
     volumes:
       - ../deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - ../deploy/nginx/maintenance/:/etc/nginx/html/maintenance/
-      - /etc/letsencrypt/live/{{main_domain}}/privkey.pem:/root/ssl/key.pem
-      - /etc/letsencrypt/live/{{main_domain}}/fullchain.pem:/root/ssl/cert.pem
+      - /etc/letsencrypt/live/{{MAIN_DOMAIN}}/privkey.pem:/root/ssl/key.pem
+      - /etc/letsencrypt/live/{{MAIN_DOMAIN}}/fullchain.pem:/root/ssl/cert.pem
     ports:
       - "443:443"
       - "80:80"

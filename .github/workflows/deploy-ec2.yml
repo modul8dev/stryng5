@@ -56,6 +56,7 @@ jobs:
       - name: Template nginx configuration
         run: |
           jinjanate deploy/nginx/nginx.conf.j2 .env --format=env  -o deploy/nginx/nginx.conf
+          jinjanate deploy/docker-compose.yml.j2 .env --format=env  -o deploy/docker-compose.yml
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v1
