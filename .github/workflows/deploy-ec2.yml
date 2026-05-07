@@ -105,6 +105,7 @@ jobs:
 
             # Put rendered files in place
             mv ~/repo/scp/deploy/nginx/nginx.conf deploy/nginx/nginx.conf
+            mv ~/repo/scp/deploy/docker-compose.yml deploy/docker-compose.yml
             mv ~/repo/scp/.env .env
 
             # Pull latest images and (re)start services
