@@ -43,6 +43,15 @@ class ProjectLanguageForm(forms.ModelForm):
 
 
 class ProjectProvisioningForm(forms.Form):
+    name = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'input input-bordered w-full',
+            'placeholder': 'My Project',
+        }),
+        label='Project Name',
+    )
     domain = forms.URLField(
         widget=forms.URLInput(attrs={
             'class': 'input input-bordered w-full',

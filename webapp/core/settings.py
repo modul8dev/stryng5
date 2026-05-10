@@ -214,7 +214,8 @@ AUTHENTICATION_BACKENDS = [
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
-ACCOUNT_ADAPTER = 'brand.adapter.BrandAccountAdapter'
+ACCOUNT_ADAPTER = 'accounts.adapter.AccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'accounts.adapter.SocialAccountAdapter'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 # django-allauth

@@ -90,10 +90,12 @@
 
         </div>
 
+        {% if not provisioning_started %}
         <!-- Skip -->
         <div class="mt-6 text-center text-sm text-zinc-500">
             <a href="/" class="font-medium text-indigo-600 hover:text-indigo-500">Skip for now</a>
         </div>
+        {% endif %}
     </div>
 
 </body>

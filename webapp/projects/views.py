@@ -12,6 +12,22 @@ from .models import Project
 
 @require_POST
 @login_required
+def project_create_quick(request):
+    """
+    Immediately create a project with a default name, switch to it,
+    store a session flag so the home view auto-opens the provision modal.
+    """
+    project = Project.objects.create(
+        name='New Project',
+        owner=request.user,
+    )
+    request.session['active_project_id'] = project.pk
+    request.session['auto_provision_project_id'] = project.pk
+    return redirect('home')
+
+
+@require_POST
+@login_required
 def switch_project(request):
     project_id = request.POST.get('project_id')
     project = get_object_or_404(Project, pk=project_id, owner=request.user)
@@ -136,8 +152,10 @@ def project_provision(request):
 
             # Update project language
             project.language = language
-            # If project name is still the default, rename to domain
-            if project.name in ('My Project', project.owner.company_name or ''):
+            custom_name = form.cleaned_data.get('name', '').strip()
+            if custom_name:
+                project.name = custom_name
+            elif project.name in ('My Project', 'New Project', project.owner.company_name or ''):
                 parsed = urlparse(url)
                 domain_name = parsed.netloc or parsed.path
                 domain_name = domain_name.removeprefix('www.')
@@ -180,7 +198,7 @@ def project_provision(request):
             response['X-Up-Events'] = '[{"type": "project:provisioning_started"}]'
             return response
     else:
-        form = ProjectProvisioningForm()
+        form = ProjectProvisioningForm(initial={'name': project.name})
 
     return render(request, 'projects/provision_modal.html', {
         'form': form,

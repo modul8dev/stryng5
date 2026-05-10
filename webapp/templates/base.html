@@ -19,6 +19,17 @@
         up.layer.config.modal.closeAnimation = 'move-to-top'
         up.layer.config.overlay.closeDuration = 500
         up.fragment.config.navigateOptions.cache = false
+
+        up.compiler('[data-auto-provision]', function(el) {
+            var pid = el.dataset.autoProvision;
+            el.remove();
+            up.layer.open({
+                url: '/projects/provision/?project_id=' + pid,
+                mode: 'modal',
+                size: 'medium',
+                history: false
+            });
+        });
     </script>
     {% block head %}{% endblock %}
 </head>
@@ -212,16 +223,16 @@
                             {% endfor %}
                             <li><hr class="my-1 border-zinc-100"></li>
                             <li>
-                                <a href="{% url 'projects:project_create' %}"
-                                   up-layer="new" up-mode="modal" up-size="medium" up-history="false"
-                                   up-on-accepted="up.visit('/', { target: 'body' })"
-                                   up-on-dismissed="up.visit('/', { target: 'body' })"
-                                   class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    New Project
-                                </a>
+                                <form method="post" action="{% url 'projects:project_create_quick' %}" up-submit up-target="body">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                        New Project
+                                    </button>
+                                </form>
                             </li>
                         </ul>
                     </div>
@@ -343,6 +354,10 @@
 
     </div>
     <!-- /drawer -->
+
+    {% if auto_provision_project_id %}
+    <div data-auto-provision="{{ auto_provision_project_id }}" hidden></div>
+    {% endif %}
 
     <script src="{% static 'js/media_library.js' %}"></script>
     <script src="{% static 'js/components/ai-textarea.js' %}"></script>

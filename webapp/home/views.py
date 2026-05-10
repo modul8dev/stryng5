@@ -77,6 +77,7 @@ def home(request):
         'is_scraping': is_scraping,
         'is_importing': is_importing,
         'media_groups': media_groups,
+        'auto_provision_project_id': request.session.pop('auto_provision_project_id', None),
     })
 
 
