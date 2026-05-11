@@ -147,53 +147,32 @@ function brandScrapeModal({ scraping = false } = {}) {
 
 /* ── Home Overview — Alpine.js component for the home page CTA blocks ──
  *
- * Tracks brand/product onboarding state and reacts to SSE events:
+ * Tracks brand/social onboarding state and reacts to SSE events:
  *   - brand:scrape_started / brand:scrape_completed / brand:scrape_error
- *   - media_library:import_started / media_library:import_completed / media_library:import_error
  *
  * Usage in template:
- *   <div x-data="homeOverview({ hasBrand: false, hasProducts: false, isScraping: false, isImporting: false })">
+ *   <div x-data="homeOverview({ hasBrand: false, hasSocials: false, isScraping: false })">
  */
-function homeOverview({ hasBrand = false, hasProducts = false, isScraping = false, isImporting = false } = {}) {
+function homeOverview({ hasBrand = false, hasSocials = false, isScraping = false } = {}) {
   return {
     hasBrand,
-    hasProducts,
+    hasSocials,
     isScraping,
-    isImporting,
 
     init() {
       this._onScrapingStarted = () => { this.isScraping = true; };
       this._onScraped = () => { this.isScraping = false; this.hasBrand = true; };
       this._onScrapeError = () => { this.isScraping = false; };
 
-      this._onImportStarted = () => { this.isImporting = true; };
-      this._onImportCompleted = () => {
-        this.isImporting = false;
-        this.hasProducts = true;
-        // Reload main content so inspiration sections appear now that products exist
-        if (typeof up !== 'undefined') {
-          up.reload('[up-main]');
-        }
-      };
-      this._onImportError = () => { this.isImporting = false; };
-
       document.addEventListener('brand:scrape_started', this._onScrapingStarted);
       document.addEventListener('brand:scrape_completed', this._onScraped);
       document.addEventListener('brand:scrape_error', this._onScrapeError);
-      document.addEventListener('media_library:import_started', this._onImportStarted);
-      document.addEventListener('media_library:import_completed', this._onImportCompleted);
-      document.addEventListener('media_library:import_error', this._onImportError);
     },
 
     destroy() {
       document.removeEventListener('brand:scrape_started', this._onScrapingStarted);
       document.removeEventListener('brand:scrape_completed', this._onScraped);
       document.removeEventListener('brand:scrape_error', this._onScrapeError);
-      document.removeEventListener('media_library:import_started', this._onImportStarted);
-      document.removeEventListener('media_library:import_completed', this._onImportCompleted);
-      document.removeEventListener('media_library:import_error', this._onImportError);
     },
   };
 }
-
-/* ── Project Provisioning — opens provision modal after project creation ── */

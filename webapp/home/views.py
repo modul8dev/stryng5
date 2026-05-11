@@ -17,6 +17,7 @@ from accounts.forms import ProfileForm
 from brand.models import Brand
 from credits.models import CreditGrant, available_credits
 from credits.views import get_subscription_info
+from integrations.models import IntegrationConnection
 from media_library.models import Media, MediaGroup
 from social_media.models import SocialMediaPost
 
@@ -65,8 +66,13 @@ def home(request):
         .order_by('-created_at')[:6]
     )
 
+    has_socials = IntegrationConnection.objects.filter(
+        project=request.project,
+        provider_category=IntegrationConnection.ProviderCategory.SOCIAL_MEDIA,
+        status=IntegrationConnection.ConnectionStatus.ACTIVE,
+    ).exists()
+
     is_scraping = brand is not None and brand.processing_status == Brand.ProcessingStatus.SCRAPING
-    is_importing = bool(request.project and request.project.product_import_in_progress)
 
     return render(request, "home/home.html", {
         'drafts': drafts,
@@ -74,8 +80,8 @@ def home(request):
         'brand': brand,
         'has_brand': has_brand,
         'has_products': has_products,
+        'has_socials': has_socials,
         'is_scraping': is_scraping,
-        'is_importing': is_importing,
         'media_groups': media_groups,
         'auto_provision_project_id': request.session.pop('auto_provision_project_id', None),
     })

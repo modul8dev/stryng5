@@ -19,17 +19,6 @@
         up.layer.config.modal.closeAnimation = 'move-to-top'
         up.layer.config.overlay.closeDuration = 500
         up.fragment.config.navigateOptions.cache = false
-
-        up.compiler('[data-auto-provision]', function(el) {
-            var pid = el.dataset.autoProvision;
-            el.remove();
-            up.layer.open({
-                url: '/projects/provision/?project_id=' + pid,
-                mode: 'modal',
-                size: 'medium',
-                history: false
-            });
-        });
     </script>
     {% block head %}{% endblock %}
 </head>
@@ -370,6 +359,8 @@
     <script src="{% static 'js/social_media.js' %}"></script>
     <script src="{% static 'js/image_editor.js' %}"></script>
     <script src="{% static 'js/scheduler.js' %}"></script>
+    <script src="{% static 'js/project-auto-provision.js' %}"></script>
+    <script src="{% static 'js/shared.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
     <script>if (window.marked) { marked.use({ breaks: true, gfm: true }); }</script>
     <script src="{% static 'js/preview-media.js' %}"></script>
