@@ -104,8 +104,7 @@
         <div class="flex flex-1 flex-col overflow-y-auto border-r border-zinc-200 bg-white">
             <form id="post-form"
                   method="post"
-                  up-submit
-                  up-layer="current">
+                  action="{% if is_edit %}{% url 'social_media:post_edit' post.pk %}{% else %}{% url 'social_media:post_create' %}{% endif %}">
                 {% csrf_token %}
 
                 {# Hidden fields for AI mode data #}

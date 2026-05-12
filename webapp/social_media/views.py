@@ -138,7 +138,7 @@ def post_create(request):
                 err = _enqueue_generation(request, post)
                 if err:
                     return err
-            return HttpResponse(status=200)
+            return JsonResponse({'post_id': post.pk})
     else:
         form = SocialMediaPostForm()
         initial_platforms = [{'platform': p} for p in enabled_platforms]
@@ -216,7 +216,7 @@ def post_edit(request, pk):
                 err = _enqueue_generation(request, post)
                 if err:
                     return err
-            return _accept_layer_response()
+            return JsonResponse({'post_id': post.pk})
     else:
         form = SocialMediaPostForm(instance=post)
         platform_formset = PlatformFormSet(instance=post, prefix='platform')

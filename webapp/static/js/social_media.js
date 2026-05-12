@@ -415,14 +415,12 @@ document.addEventListener('alpine:init', () => {
     },
 
     _subscribeGenerationSSE() {
-      if (!this.postId) return;
       if (this._generationSseCleanup) this._generationSseCleanup();
 
-      const postId = this.postId;
       let timer = null;
 
       const handler = (e) => {
-        if (e.detail && e.detail.post_id == postId) {
+        if (e.detail && e.detail.post_id == this.postId) {
           cleanup();
           this._onGenerationDone(e.detail);
         }
@@ -726,7 +724,17 @@ document.addEventListener('alpine:init', () => {
         this.syncSharedMediaFormset();
         this.syncPlatformMediaJson();
 
-        await up.submit(form, { params: { action }, layer: 'current', target: ':none' });
+        const formData = new FormData(form);
+        formData.set('action', action);
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        const resp = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-CSRFToken': csrfToken },
+        });
+        if (!resp.ok) return false;
+        const data = await resp.json();
+        if (data.post_id) this.postId = data.post_id;
 
         if (closeOnSuccess) {
           up.layer.accept();
