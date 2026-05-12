@@ -163,16 +163,26 @@ function homeOverview({ hasBrand = false, hasSocials = false, isScraping = false
       this._onScrapingStarted = () => { this.isScraping = true; };
       this._onScraped = () => { this.isScraping = false; this.hasBrand = true; };
       this._onScrapeError = () => { this.isScraping = false; };
+      this._onProvisioningStarted = (e) => {
+        this.isScraping = true;
+        var name = (e.detail && e.detail.project_name) || e.project_name;
+        if (name) {
+          var el = document.getElementById('current-project-name');
+          if (el) el.textContent = name;
+        }
+      };
 
       document.addEventListener('brand:scrape_started', this._onScrapingStarted);
       document.addEventListener('brand:scrape_completed', this._onScraped);
       document.addEventListener('brand:scrape_error', this._onScrapeError);
+      document.addEventListener('project:provisioning_started', this._onProvisioningStarted);
     },
 
     destroy() {
       document.removeEventListener('brand:scrape_started', this._onScrapingStarted);
       document.removeEventListener('brand:scrape_completed', this._onScraped);
       document.removeEventListener('brand:scrape_error', this._onScrapeError);
+      document.removeEventListener('project:provisioning_started', this._onProvisioningStarted);
     },
   };
 }

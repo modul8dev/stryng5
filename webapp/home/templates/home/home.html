@@ -21,7 +21,12 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-semibold text-zinc-900">Set up your brand</h3>
-                    <p class="mt-1 text-sm text-zinc-600" x-show="!isScraping">Add your brand details so AI can generate on-brand content for you.</p>
+                    <p class="mt-1 text-sm text-zinc-600">Tell us about your brand so every piece of content feels authentically yours.</p>
+                    <ul class="mt-2 space-y-1 text-sm text-zinc-500 list-none">
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-indigo-400">&#10003;</span>We&rsquo;ll scan your website to extract your logo, colours, and tone of voice</li>
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-indigo-400">&#10003;</span>AI-generated posts will match your brand style automatically</li>
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-indigo-400">&#10003;</span>Your product catalogue is imported so you can create content in seconds</li>
+                    </ul>
                     <p class="mt-1 text-sm text-zinc-600" x-show="isScraping" style="display:none">Scraping your brand website &mdash; this may take a minute&hellip;</p>
                     <a x-show="!isScraping"
                        href="{% url 'projects:project_provision' %}?project_id={{ request.project.pk }}"
@@ -45,7 +50,12 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-semibold text-zinc-900">Connect social media</h3>
-                    <p class="mt-1 text-sm text-zinc-600">Connect your social accounts so you can publish posts directly from the app.</p>
+                    <p class="mt-1 text-sm text-zinc-600">Link your social accounts to publish and schedule posts without leaving the app.</p>
+                    <ul class="mt-2 space-y-1 text-sm text-zinc-500 list-none">
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-violet-400">&#10003;</span>Publish to Instagram, Facebook, LinkedIn, and X from one place</li>
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-violet-400">&#10003;</span>Schedule posts ahead of time so your feed stays consistent</li>
+                        <li class="flex items-start gap-1.5"><span class="mt-0.5 text-violet-400">&#10003;</span>Each post is automatically adapted to the right format per platform</li>
+                    </ul>
                     <a href="{% url 'integrations:integration_list' %}" up-follow
                        class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-500">
                         Connect now

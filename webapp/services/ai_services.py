@@ -157,6 +157,67 @@ def select_brand_urls(all_urls, base_url):
     return [u for u in result.urls if isinstance(u, str) and u in all_urls_set]
 
 
+def select_product_urls(all_urls, base_url):
+    """
+    Ask the LLM to pick up to 50 URLs most likely to contain products or
+    brand-relevant visual assets for social media creation.
+    Returns a list of URL strings (subset of all_urls).
+    """
+    from services.prompts.product_url_select import PRODUCT_URL_SELECT_PROMPT
+
+    url_list = '\n'.join(all_urls[:500])  # cap to avoid token overflow
+    user_msg = f'Website: {base_url}\n\nAvailable URLs:\n{url_list}'
+    result = _openai_chat_parsed(
+        messages=[
+            {'role': 'system', 'content': PRODUCT_URL_SELECT_PROMPT},
+            {'role': 'user', 'content': user_msg},
+        ],
+        text_format=_UrlSelectResult,
+        model=OpenAIModel.QUICK,
+    )
+    all_urls_set = set(all_urls)
+    return [u for u in result.urls if isinstance(u, str) and u in all_urls_set][:50]
+
+
+class _PageSummaryResult(PydanticBaseModel):
+    title: str
+    summary: str
+
+
+def summarize_page_markdown(markdown_content, language_name='English'):
+    """
+    Extract a short title and a ~200-word summary from a web page's markdown.
+    Returns a dict with 'title' and 'summary' keys.
+    """
+    from services.prompts.language import get_language_instruction
+    lang_instruction = get_language_instruction(language_name)
+
+    result = _openai_chat_parsed(
+        messages=[
+            {
+                'role': 'system',
+                'content': (
+                    'You are given the markdown content of a web page. '
+                    'Extract two things:\n'
+                    '1. "title" — a short, descriptive title for the page '
+                    '(the product name, service name, or main topic).\n'
+                    '2. "summary" — describing the main content of the page. '
+                    'Structure the summary into paragraphs separated by newlines. '
+                    'Focus exclusively on the product, service, or asset presented. '
+                    'Ignore navigation menus, filters, sidebars, footers, '
+                    'cookie banners, and other UI chrome. '
+                    'Do not describe the page layout or visual design elements.\n\n'
+                    + lang_instruction
+                ),
+            },
+            {'role': 'user', 'content': markdown_content[:15000]},
+        ],
+        text_format=_PageSummaryResult,
+        model=OpenAIModel.QUICK,
+    )
+    return {'title': result.title, 'summary': result.summary}
+
+
 def get_unsplash_search_term(brand):
     """Use brand data to generate a short, relevant Unsplash search term (2-3 words)."""
     ctx = _get_brand_context(brand)

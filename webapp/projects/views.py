@@ -1,3 +1,4 @@
+import json
 from urllib.parse import urlparse
 
 from django.contrib import messages
@@ -155,7 +156,7 @@ def project_provision(request):
             custom_name = form.cleaned_data.get('name', '').strip()
             if custom_name:
                 project.name = custom_name
-            elif project.name in ('My Project', 'New Project', project.owner.company_name or ''):
+            else:
                 parsed = urlparse(url)
                 domain_name = parsed.netloc or parsed.path
                 domain_name = domain_name.removeprefix('www.')
@@ -195,10 +196,11 @@ def project_provision(request):
                 'project': project,
                 'provisioning_started': True,
             })
-            response['X-Up-Events'] = '[{"type": "project:provisioning_started"}]'
+            events = json.dumps([{'type': 'project:provisioning_started', 'project_name': project.name}])
+            response['X-Up-Events'] = events
             return response
     else:
-        form = ProjectProvisioningForm(initial={'name': project.name})
+        form = ProjectProvisioningForm()
 
     return render(request, 'projects/provision_modal.html', {
         'form': form,

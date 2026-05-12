@@ -305,6 +305,8 @@ EVENTSTREAM_REDIS = {
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
 # Unsplash API access key — https://unsplash.com/developers
 UNSPLASH_ACCESS_KEY = os.environ.get('UNSPLASH_ACCESS_KEY', '')
+# Firecrawl webhook shared secret — verify inbound webhook requests
+FIRECRAWL_WEBHOOK_SECRET = os.environ.get('FIRECRAWL_WEBHOOK_SECRET', '')
 
 # ─── Authlib OAuth Clients (for integrations app) ──────────────────────
 AUTHLIB_OAUTH_CLIENTS = {

@@ -3,6 +3,22 @@
     <h2 class="text-xl font-bold mb-2">Import from URL</h2>
     <p class="text-sm text-zinc-500 mb-6">Enter a webpage URL to scrape and import all media as a new media group.</p>
 
+    {% if importing %}
+    <div x-data="productImportModal({ importing: true })">
+        <div x-show="error" class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4" style="display:none">
+            <span x-text="error"></span>
+        </div>
+        <div x-show="importing" class="flex flex-col items-center justify-center py-8">
+            <span class="loading loading-spinner loading-lg text-indigo-600"></span>
+            <p class="mt-4 text-sm text-zinc-500">Scraping page for media…</p>
+            <p class="mt-1 text-xs text-zinc-400">You will be notified when it finishes.</p>
+        </div>
+        <div class="flex justify-end">
+            <button type="button" class="btn btn-ghost" up-dismiss>Close</button>
+        </div>
+    </div>
+    {% else %}
+
     {% if error %}
     <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-4">
         {{ error }}
@@ -11,13 +27,10 @@
 
     <form method="post"
           up-submit
-          up-layer="current"
-          id="url-import-form"
-          x-data="{ submitting: false }"
-          @submit="if ($el.checkValidity()) submitting = true">
+          up-layer="current">
         {% csrf_token %}
 
-        <div class="form-control w-full mb-6" x-show="!submitting">
+        <div class="form-control w-full mb-6">
             <label class="label" for="page_url">
                 <span class="label-text font-medium">Page URL</span>
             </label>
@@ -33,16 +46,11 @@
             </label>
         </div>
 
-        <div class="flex flex-col items-center justify-center py-8" x-show="submitting" x-cloak>
-            <span class="loading loading-spinner loading-lg text-indigo-600"></span>
-            <p class="mt-4 text-sm text-zinc-500">Scraping page for media…</p>
-            <p class="mt-1 text-xs text-zinc-400">This may take a moment.</p>
-        </div>
-
-        <div class="flex justify-end gap-2" x-show="!submitting">
+        <div class="flex justify-end gap-2">
             <button type="button" class="btn btn-ghost" up-dismiss>Cancel</button>
             <button type="submit" class="btn btn-primary">Import</button>
         </div>
     </form>
+    {% endif %}
 </div>
 </main>

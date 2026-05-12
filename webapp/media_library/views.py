@@ -1,6 +1,7 @@
+import hashlib
+import hmac
 import json
 import os
-from collections import Counter
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
@@ -20,11 +21,6 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .forms import MediaFormSet, MediaGroupForm
-from .image_heuristics import (
-    _normalize_media_identity,
-    _page_context_from_crawl_doc,
-    _select_distinct_product_media_urls,
-)
 from .models import Media, MediaGroup
 
 
@@ -134,34 +130,58 @@ def _is_woocommerce(base_url):
             headers={'Content-Type': 'application/json'},
             timeout=10,
         )
-        return resp.status_code == 200
-    except http_requests.RequestException:
+        if resp.status_code != 200:
+            return False
+        data = resp.json()
+        return isinstance(data, list)
+    except (http_requests.RequestException, ValueError):
         return False
 
 
-def _import_shopify_products(user, base_url, project=None):
+def _import_shopify_products(user, base_url, project=None, single_url=None):
     """
     Import products and media from a Shopify store.
+    If single_url is provided, import only the product at that URL.
     Returns a tuple (success: bool, error: str or None).
     """
     parsed = urlparse(base_url)
     shop_domain = parsed.hostname
 
-    # Fetch all products via the public /products.json endpoint
-    all_products = []
-    page = 1
-    while page <= 20:
-        products_url = f'https://{shop_domain}/products.json?limit=250&page={page}'
+    if single_url:
+        # Extract product handle from the URL path (e.g. /products/my-product)
+        single_parsed = urlparse(single_url)
+        path_parts = [p for p in single_parsed.path.strip('/').split('/') if p]
+        handle = None
+        if len(path_parts) >= 2 and path_parts[-2] == 'products':
+            handle = path_parts[-1]
+        if not handle:
+            return False, None  # not a product URL, let caller fall through
+        product_url = f'https://{shop_domain}/products/{handle}.json'
         try:
-            resp = http_requests.get(products_url, timeout=30)
+            resp = http_requests.get(product_url, timeout=30)
             resp.raise_for_status()
-            products = resp.json().get('products', [])
+            product = resp.json().get('product')
         except http_requests.RequestException:
-            break
-        if not products:
-            break
-        all_products.extend(products)
-        page += 1
+            return False, None
+        if not product:
+            return False, None
+        all_products = [product]
+    else:
+        # Fetch all products via the public /products.json endpoint
+        all_products = []
+        page = 1
+        while page <= 20:
+            products_url = f'https://{shop_domain}/products.json?limit=250&page={page}'
+            try:
+                resp = http_requests.get(products_url, timeout=30)
+                resp.raise_for_status()
+                products = resp.json().get('products', [])
+            except http_requests.RequestException:
+                break
+            if not products:
+                break
+            all_products.extend(products)
+            page += 1
 
     if not all_products:
         return False, 'No products found in this store.'
@@ -191,56 +211,83 @@ def _import_shopify_products(user, base_url, project=None):
     return True, None
 
 
-def _import_woocommerce_products(user, base_url, project=None):
+def _import_woocommerce_products(user, base_url, project=None, single_url=None):
     """
     Import products and media from a WooCommerce store via the Store API.
+    If single_url is provided, import only the product matching that URL's slug.
     Returns a tuple (success: bool, error: str or None).
     """
     api_url = f'{base_url}/wp-json/wc/store/v1/products'
 
-    page = 1
-    per_page = 50
-    all_products = []
-
-    while page <= 40:
+    if single_url:
+        # Extract slug from the last non-empty path segment
+        single_parsed = urlparse(single_url)
+        path_parts = [p for p in single_parsed.path.strip('/').split('/') if p]
+        slug = path_parts[-1] if path_parts else None
+        if not slug:
+            return False, None  # can't determine slug, let caller fall through
         try:
             resp = http_requests.get(
                 api_url,
-                params={'page': page, 'per_page': per_page},
+                params={'slug': slug},
                 headers={'Content-Type': 'application/json'},
                 timeout=30,
             )
         except http_requests.RequestException:
-            return False, 'Could not connect to store. Please check the URL.'
-
+            return False, None
         if resp.status_code != 200:
-            break
-
+            return False, None
         try:
             products = resp.json()
         except ValueError:
-            return False, 'Unexpected response from the store.'
+            return False, None
+        if not isinstance(products, list) or not products:
+            return False, None
+        all_products = products
+    else:
+        page = 1
+        per_page = 50
+        all_products = []
 
-        if not isinstance(products, list):
-            return False, 'Unexpected response from the store.'
-
-        if not products:
-            break
-
-        all_products.extend(products)
-
-        total_pages_header = resp.headers.get('X-WP-TotalPages')
-        if total_pages_header:
+        while page <= 40:
             try:
-                if page >= int(total_pages_header):
-                    break
+                resp = http_requests.get(
+                    api_url,
+                    params={'page': page, 'per_page': per_page},
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30,
+                )
+            except http_requests.RequestException:
+                return False, 'Could not connect to store. Please check the URL.'
+
+            if resp.status_code != 200:
+                break
+
+            try:
+                products = resp.json()
             except ValueError:
-                pass
+                return False, 'Unexpected response from the store.'
 
-        if len(products) < per_page:
-            break
+            if not isinstance(products, list):
+                return False, 'Unexpected response from the store.'
 
-        page += 1
+            if not products:
+                break
+
+            all_products.extend(products)
+
+            total_pages_header = resp.headers.get('X-WP-TotalPages')
+            if total_pages_header:
+                try:
+                    if page >= int(total_pages_header):
+                        break
+                except ValueError:
+                    pass
+
+            if len(products) < per_page:
+                break
+
+            page += 1
 
     if not all_products:
         return False, 'No products found in this store.'
@@ -268,84 +315,90 @@ def _import_woocommerce_products(user, base_url, project=None):
     return True, None
 
 
-def _import_domain_with_crawl(user, base_url, project=None):
+def _import_domain_with_crawl(user, base_url, project=None, single_url=None):
     """
-    Crawl a domain with Firecrawl (up to 100 pages, skipping /blog) and create
-    a MediaGroup per page from the media items and description found on each page.
+    Map a domain with Firecrawl, use AI to select up to 50 product-relevant
+    URLs, then kick off a batch scrape with a webhook callback.
+    If single_url is provided, scrape only that URL directly.
     Returns (success: bool, error: str | None).
+    When the batch is started successfully returns (True, 'batch_started') so
+    callers know processing continues asynchronously via the webhook.
     """
     api_key = os.environ.get('FIRECRAWL_API_KEY', '')
     if not api_key:
         return False, 'FIRECRAWL_API_KEY is not configured.'
 
+    from django.conf import settings
     from firecrawl import Firecrawl
+    from firecrawl.v2.types import WebhookConfig
+
     fc = Firecrawl(api_key=api_key)
 
+    if single_url:
+        selected_urls = [single_url]
+    else:
+        from services.ai_services import select_product_urls
+
+        # ── Phase 1: Map the website to discover URLs ────────────────────────
+        all_urls = []
+        try:
+            map_result = fc.map(base_url, limit=500, sitemap="skip")
+            raw_links = getattr(map_result, 'links', None) or []
+            for item in raw_links:
+                if isinstance(item, dict):
+                    u = item.get('url', '')
+                else:
+                    u = getattr(item, 'url', str(item))
+                if u:
+                    all_urls.append(u)
+        except Exception:
+            pass  # map failure is non-fatal; we can still try the base URL
+
+        if not all_urls:
+            all_urls = [base_url]
+
+        # ── Phase 2: AI selects up to 50 product-relevant URLs ───────────────
+        if len(all_urls) > 1:
+            try:
+                selected_urls = select_product_urls(all_urls, base_url)
+            except Exception:
+                selected_urls = []
+        else:
+            selected_urls = []
+
+        # Always include the base URL; deduplicate
+        if base_url not in selected_urls:
+            selected_urls.insert(0, base_url)
+        selected_urls = selected_urls[:50]
+
+    # ── Phase 3: Batch scrape with webhook ───────────────────────────────────
+    webhook_url = f'{settings.SITE_URL}/media-library/firecrawl-webhook/'
+
     try:
-        result = fc.crawl(
-            base_url,
-            limit=100,
-            exclude_paths=['/blog.*'],
-            crawl_entire_domain=True,
-            scrape_options={
-                'formats': ['media'],
-                'only_main_content': True,
-            },
+        fc.start_batch_scrape(
+            selected_urls,
+            formats=['markdown'],
+            only_main_content=True,
+            webhook=WebhookConfig(
+                url=webhook_url,
+                metadata={
+                    'project_id': str(project.pk) if project else '',
+                    'user_id': str(user.pk),
+                },
+                events=['page', 'completed'],
+            ),
         )
     except Exception as exc:
-        return False, f'Failed to crawl site: {exc}'
+        return False, f'Failed to start batch scrape: {exc}'
 
-    pages = getattr(result, 'data', None) or []
-    if not pages:
-        return False, 'No pages found at this URL.'
-
-    page_contexts = []
-    asset_page_counts = Counter()
-    for doc in pages:
-        context = _page_context_from_crawl_doc(doc, base_url)
-        page_contexts.append(context)
-
-        identities = {
-            _normalize_media_identity(urljoin(context['page_url'], media_url))
-            for media_url in context['media_urls']
-            if media_url and not media_url.startswith('data:')
-        }
-        asset_page_counts.update(identity for identity in identities if identity)
-
-    created = 0
-    for context in page_contexts:
-        media_urls = _select_distinct_product_media_urls(
-            context['media_urls'],
-            page_url=context['page_url'],
-            page_title=context['title'],
-            page_description=context['description'],
-            asset_page_counts=asset_page_counts,
-            total_pages=len(page_contexts),
-        )
-        if not media_urls:
-            continue
-
-        group = MediaGroup.objects.create(
-            user=user,
-            project=project,
-            title=context['title'],
-            description=context['description'],
-            source_url=context['page_url'],
-            type=MediaGroup.GroupType.PRODUCT,
-        )
-        for img_url in media_urls:
-            Media.objects.create(media_group=group, external_url=img_url, source_type=Media.SourceType.IMPORTED)
-        created += 1
-
-    if created == 0:
-        return False, 'No media found on any crawled page.'
-
-    return True, None
+    return True, 'batch_started'
 
 
-def _detect_and_import_products(user, shop_url, project=None):
+def _detect_and_import_products(user, shop_url, project=None, single_url=False):
     """
     Auto-detect whether shop_url is a WooCommerce or Shopify store, then import.
+    If single_url is True, import only the specific page at shop_url instead of
+    all products from the domain.
     Returns a tuple (success: bool, error: str or None).
     """
     if not shop_url.startswith(('http://', 'https://')):
@@ -358,14 +411,21 @@ def _detect_and_import_products(user, shop_url, project=None):
         return False, 'Please enter a valid store URL.'
 
     base_url = f'https://{shop_domain}'
+    url_arg = shop_url if single_url else None
 
     if _is_woocommerce(base_url):
-        return _import_woocommerce_products(user, base_url, project=project)
+        ok, err = _import_woocommerce_products(user, base_url, project=project, single_url=url_arg)
+        if single_url and not ok and err is None:
+            return _import_domain_with_crawl(user, base_url, project=project, single_url=url_arg)
+        return ok, err
 
     if _is_shopify(base_url):
-        return _import_shopify_products(user, base_url, project=project)
+        ok, err = _import_shopify_products(user, base_url, project=project, single_url=url_arg)
+        if single_url and not ok and err is None:
+            return _import_domain_with_crawl(user, base_url, project=project, single_url=url_arg)
+        return ok, err
 
-    return _import_domain_with_crawl(user, base_url, project=project)
+    return _import_domain_with_crawl(user, base_url, project=project, single_url=url_arg)
 
 
 @login_required
@@ -402,6 +462,91 @@ def products_import(request):
     return render(request, 'media_library/products_import.html', {
         'importing': request.project.product_import_in_progress,
     })
+
+
+# ─── Firecrawl Webhook ───────────────────────────────────────────────────────
+
+try:
+    from django.contrib.auth.decorators import login_not_required
+except ImportError:
+    def login_not_required(func):
+        return func
+
+
+@login_not_required
+@csrf_exempt
+@require_POST
+def firecrawl_webhook(request):
+    """
+    Receive Firecrawl batch-scrape webhook events.
+    - batch_scrape.page  → enqueue a task to process each scraped page
+    - batch_scrape.completed → mark import done and notify via SSE
+    """
+    from django.conf import settings
+
+    # Verify HMAC signature
+    webhook_secret = settings.FIRECRAWL_WEBHOOK_SECRET
+    if webhook_secret:
+        signature = request.META.get('HTTP_X_FIRECRAWL_SIGNATURE', '')
+        if not signature:
+            return HttpResponse(status=401)
+        try:
+            algorithm, hash_value = signature.split('=', 1)
+            if algorithm != 'sha256':
+                return HttpResponse(status=401)
+        except ValueError:
+            return HttpResponse(status=401)
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            request.body,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(hash_value, expected_signature):
+            return HttpResponse(status=401)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return HttpResponse(status=400)
+
+    event_type = body.get('type', '')
+    metadata = body.get('metadata') or {}
+    project_id = metadata.get('project_id', '')
+    user_id = metadata.get('user_id', '')
+
+    if event_type == 'batch_scrape.page':
+        data = body.get('data')
+        if isinstance(data, list):
+            pages = data
+        elif isinstance(data, dict):
+            pages = [data]
+        else:
+            pages = []
+
+        from django_q.tasks import async_task
+        from .tasks import process_crawled_url_task
+
+        for page_data in pages:
+            async_task(
+                process_crawled_url_task,
+                page_data,
+                project_id,
+                user_id,
+            )
+
+    elif event_type == 'batch_scrape.completed':
+        if project_id:
+            from projects.models import Project
+            Project.objects.filter(pk=int(project_id)).update(product_import_in_progress=False)
+
+        if user_id:
+            from django_eventstream import send_event
+            send_event(
+                f'user-{user_id}', 'message',
+                {'type': 'media_library:import_completed', 'status': 'done'},
+            )
+
+    return HttpResponse(status=200)
 
 
 class _ImgSrcParser(HTMLParser):
@@ -480,6 +625,13 @@ def _import_url_media(user, page_url, project=None):
 @login_required
 def url_import(request):
     if request.method == 'POST':
+        if request.project.product_import_in_progress:
+            return render(request, 'media_library/url_import.html', {
+                'error': 'An import is already in progress. Please wait for it to finish.',
+                'page_url': '',
+                'importing': True,
+            })
+
         page_url = request.POST.get('page_url', '').strip()
         validate = URLValidator()
         try:
@@ -490,16 +642,24 @@ def url_import(request):
                 'page_url': page_url,
             })
 
-        success, error = _import_url_media(request.user, page_url, project=request.project)
-        if success:
-            return _accept_layer_response()
+        request.project.product_import_in_progress = True
+        request.project.save(update_fields=['product_import_in_progress'])
 
-        return render(request, 'media_library/url_import.html', {
-            'error': error,
-            'page_url': page_url,
-        })
+        from django_q.tasks import async_task
+        from .tasks import import_products_task
+        async_task(
+            import_products_task,
+            request.project.pk,
+            page_url,
+            user_id=request.user.pk,
+            single_url=True,
+        )
 
-    return render(request, 'media_library/url_import.html')
+        return render(request, 'media_library/url_import.html', {'importing': True})
+
+    return render(request, 'media_library/url_import.html', {
+        'importing': request.project.product_import_in_progress,
+    })
 
 
 @login_required
