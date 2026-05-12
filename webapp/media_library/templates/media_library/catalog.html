@@ -175,7 +175,7 @@
                     <div class="flex items-center justify-between gap-2 mt-4">
                         <button type="button"
                                 up-follow
-                                up-href="{% url 'social_media:post_create' %}?seed_media_ids={% for item in group.media_items.all %}{{ item.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                up-href="{% url 'social_media:post_create' %}?auto_suggest=1&seed_media_ids={% for item in group.imported_media_items %}{{ item.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
                                 up-layer="new"
                                 up-mode="modal"
                                 up-size="large"

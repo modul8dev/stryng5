@@ -151,7 +151,7 @@ document.addEventListener('alpine:init', () => {
       const seedEl = document.getElementById('selected-seed-media-json');
       if (seedEl) {
         const data = JSON.parse(seedEl.textContent);
-        this.seedMedia = data.map(item => ({
+        this.seedMedia = data.slice(0, 8).map(item => ({
           mediaId: this._nextTempId(),
           media: item.media,
           url: item.url,
@@ -172,6 +172,12 @@ document.addEventListener('alpine:init', () => {
         if (prefillMode === 'ai' || prefillMode === 'editor') {
           this.mode = prefillMode;
         }
+      }
+
+      // Auto-trigger AI suggest when opened from catalog
+      const autoSuggestEl = document.getElementById('prefill-auto-suggest-json');
+      if (autoSuggestEl && this.seedMedia.length > 0 && !this.topic) {
+        this.$nextTick(() => this.suggestTopic());
       }
 
       // Track dirty state on any form input/change
@@ -508,6 +514,7 @@ document.addEventListener('alpine:init', () => {
 
     addEditorResultToSeeds({ media }) {
       if (!media || this.seedMedia.some(i => i.media === media)) return;
+      if (this.seedMedia.length >= 8) return;
       this.seedMedia = [...this.seedMedia, { mediaId: this._nextTempId(), media, url: media }];
       this.isDirty = true;
     },
@@ -537,8 +544,8 @@ document.addEventListener('alpine:init', () => {
     pickerAccepted({ target, mediaIds, urls, isVideoMap }) {
       this.isDirty = true;
       if (target === 'seed') {
-        // Seed media: replace fully
-        this.seedMedia = mediaIds.map(id => ({
+        // Seed media: replace fully, limit to 8
+        this.seedMedia = mediaIds.slice(0, 8).map(id => ({
           mediaId: this._nextTempId(),
           media: id,
           url: urls[id],

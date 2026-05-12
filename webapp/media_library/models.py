@@ -60,6 +60,9 @@ class MediaGroup(models.Model):
     def __str__(self):
         return self.title
 
+    def imported_media_items(self):
+        return self.media_items.filter(source_type=Media.SourceType.IMPORTED)
+
 
 class Media(models.Model):
     class MediaType(models.TextChoices):

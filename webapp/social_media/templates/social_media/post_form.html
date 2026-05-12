@@ -205,8 +205,17 @@
                                class="input input-bordered w-full"
                                placeholder="Post topic…" />
                         </c-ai_textarea>
+                        {# AI topic suggestions skeleton #}
+                        <div x-show="suggestingTopic" x-cloak class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+                            <div class="skeleton h-3 w-24 mb-2"></div>
+                            <div class="flex flex-col gap-1.5">
+                                <div class="skeleton h-8 w-full rounded-md"></div>
+                                <div class="skeleton h-8 w-full rounded-md"></div>
+                                <div class="skeleton h-8 w-3/4 rounded-md"></div>
+                            </div>
+                        </div>
                         {# AI topic suggestions #}
-                        <div x-show="topicSuggestions.length > 0" class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+                        <div x-show="topicSuggestions.length > 0 && !suggestingTopic" class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
                             <p class="text-xs font-medium text-indigo-700 mb-2">Select a topic:</p>
                             <div class="flex flex-col gap-1.5">
                                 <template x-for="(t, i) in topicSuggestions" :key="i">
@@ -636,6 +645,7 @@
 {{ selected_seed_media|json_script:"selected-seed-media-json" }}
 {% if prefill_topic %}<script type="application/json" id="prefill-topic-json">{{ prefill_topic }}</script>{% endif %}
 {% if prefill_mode %}<script type="application/json" id="prefill-mode-json">{{ prefill_mode }}</script>{% endif %}
+{% if auto_suggest %}<script type="application/json" id="prefill-auto-suggest-json">1</script>{% endif %}
 
 {# Hidden platform override media JSON field (synced by Alpine before submit) #}
 <input type="hidden" id="platform-override-media-json-input" name="platform_override_media_json" value="{}" form="post-form" />

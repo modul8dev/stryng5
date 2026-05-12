@@ -160,15 +160,16 @@ def post_create(request):
     # Support prefill from query params (used by inspiration cards)
     prefill_topic = request.GET.get('topic', '')
     prefill_mode = request.GET.get('mode', '')
+    auto_suggest = request.GET.get('auto_suggest', '') == '1'
     prefill_seed_media_ids_raw = request.GET.get('seed_media_ids', '')
     prefill_seed_media = []
     if prefill_seed_media_ids_raw:
         try:
-            id_list = [int(x) for x in prefill_seed_media_ids_raw.split(',') if x.strip()]
+            id_list = [int(x) for x in prefill_seed_media_ids_raw.split(',') if x.strip()][:8]
             prefill_seed_media = [
                 {'media': m.id, 'url': m.url, 'is_video': m.is_video}
                 for m in Media.objects.filter(id__in=id_list, media_group__project=request.project)
-            ]
+            ][:8]
         except (ValueError, TypeError):
             pass
 
@@ -186,6 +187,7 @@ def post_create(request):
         'is_edit': False,
         'prefill_topic': prefill_topic,
         'prefill_mode': prefill_mode,
+        'auto_suggest': auto_suggest,
     })
 
 
