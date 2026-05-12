@@ -1,9 +1,12 @@
-<div id="inspiration-deferred"
-     data-inspiration-key="{{ cache_key }}"
-     data-inspiration-result-url="{% url 'inspiration_cards_result' %}?key={{ cache_key }}">
+{% load static %}
+<div id="inspiration-deferred">
+{% if slots %}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {% for _ in "123" %}
-        <div class="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm animate-pulse">
+        {% for slot in slots %}
+        <div id="inspiration-slot-{{ slot.slot_id }}"
+             class="inspiration-slot flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm animate-pulse"
+             data-slot-id="{{ slot.slot_id }}"
+             data-card-url="{% url 'inspiration_card_result' %}?key=inspiration_card_{{ slot.slot_id }}">
             <div class="h-40 bg-zinc-100"></div>
             <div class="p-4 space-y-3">
                 <div class="h-4 bg-zinc-100 rounded w-3/4"></div>
@@ -13,4 +16,13 @@
         </div>
         {% endfor %}
     </div>
+{% else %}
+    <div class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-white py-12 text-center">
+        <div class="flex size-12 items-center justify-center rounded-xl bg-zinc-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+        </div>
+        <p class="mt-3 text-sm font-medium text-zinc-900">No inspiration available</p>
+        <p class="mt-1 text-sm text-zinc-500">Set up your brand and import products to get AI-powered content ideas.</p>
+    </div>
+{% endif %}
 </div>

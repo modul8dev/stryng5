@@ -276,7 +276,7 @@ CREDITS_SIGNUP_DAYS = int(os.environ.get('CREDITS_SIGNUP_DAYS', '30'))
 # ─── Django Q2 ───────────────────────────────────────────────────────────────
 Q_CLUSTER = {
     'name': 'DjangORM',
-    'workers': 2,
+    'workers': 6,
     'timeout': 300,
     'retry': 360,
     'queue_limit': 50,

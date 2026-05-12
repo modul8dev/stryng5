@@ -89,40 +89,62 @@ def home(request):
 
 @login_required
 def inspiration_cards(request):
-    cache_key = f'inspiration_{uuid.uuid4().hex}'
-    async_task(
-        'home.tasks.generate_inspiration_task',
-        request.project.id,
-        request.user.id,
-        cache_key,
+    from brand.models import Brand as BrandModel
+    import random
+
+    try:
+        brand = BrandModel.objects.get(project=request.project)
+        has_brand = brand.has_data
+    except BrandModel.DoesNotExist:
+        has_brand = False
+
+    product_groups = list(
+        MediaGroup.objects.filter(project=request.project, type=MediaGroup.GroupType.PRODUCT)
     )
-    return render(request, 'home/_inspiration_loading.html', {'cache_key': cache_key})
+
+    slots = []
+    if has_brand and product_groups:
+        selected = random.sample(product_groups, min(6, len(product_groups)))
+        for group in selected:
+            slot_id = uuid.uuid4().hex
+            async_task(
+                'home.tasks.generate_inspiration_card_task',
+                request.project.id,
+                request.user.id,
+                group.id,
+                slot_id,
+            )
+            slots.append({'slot_id': slot_id, 'group_title': group.title})
+
+    return render(request, 'home/_inspiration_loading.html', {'slots': slots})
 
 
 @login_required
-def inspiration_cards_result(request):
+def inspiration_card_result(request):
     cache_key = request.GET.get('key', '')
-    if not cache_key.startswith('inspiration_') or len(cache_key) > 50:
-        return render(request, 'home/_inspiration_cards.html', {'cards': []})
+    if not cache_key.startswith('inspiration_card_') or len(cache_key) > 60:
+        return HttpResponse('')
 
     cached = cache.get(cache_key)
     if not cached or cached.get('project_id') != request.project.id:
-        return render(request, 'home/_inspiration_cards.html', {'cards': []})
+        return HttpResponse('')
 
-    raw_cards = cached.get('cards', [])
-    media_ids = [c['media'] for c in raw_cards if c['media']]
-    media_by_id = {m.id: m for m in Media.objects.filter(id__in=media_ids)}
+    card_data = cached.get('card')
+    if not card_data:
+        return HttpResponse('')
 
-    cards = []
-    for c in raw_cards:
-        cards.append({
-            'group': {'title': c['group_title']},
-            'media': media_by_id.get(c['media']),
-            'topic': c['topic'],
-            'seed_media_ids': c['seed_media_ids'],
-        })
+    media_obj = None
+    if card_data.get('media'):
+        media_obj = Media.objects.filter(id=card_data['media']).first()
 
-    return render(request, 'home/_inspiration_cards.html', {'cards': cards})
+    card = {
+        'group': {'title': card_data['group_title']},
+        'media': media_obj,
+        'topic': card_data['topic'],
+        'seed_media_ids': card_data['seed_media_ids'],
+    }
+
+    return render(request, 'home/_inspiration_card.html', {'card': card})
 
 @login_required
 def settings(request):
