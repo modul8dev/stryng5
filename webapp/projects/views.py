@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import ProjectForm, ProjectLanguageForm, ProjectProvisioningForm, ProjectSettingsForm
+from .forms import ProjectForm, ProjectLanguageForm, ProjectProvisioningForm, ProjectPublishTimeForm, ProjectSettingsForm, ProjectTimezoneForm
 from .models import Project
 
 
@@ -84,6 +84,8 @@ def project_settings(request):
     name_form = ProjectForm(instance=project)
     settings_form = ProjectSettingsForm(instance=project)
     language_form = ProjectLanguageForm(instance=project)
+    publish_time_form = ProjectPublishTimeForm(instance=project)
+    timezone_form = ProjectTimezoneForm(instance=project)
 
     if request.method == 'POST':
         if 'save_name' in request.POST:
@@ -98,6 +100,18 @@ def project_settings(request):
                 settings_form.save()
                 messages.success(request, 'Platform settings saved.')
                 return redirect('projects:project_settings')
+        elif 'save_publish_time' in request.POST:
+            publish_time_form = ProjectPublishTimeForm(request.POST, instance=project)
+            if publish_time_form.is_valid():
+                publish_time_form.save()
+                messages.success(request, 'Default publish time updated.')
+                return redirect('projects:project_settings')
+        elif 'save_timezone' in request.POST:
+            timezone_form = ProjectTimezoneForm(request.POST, instance=project)
+            if timezone_form.is_valid():
+                timezone_form.save()
+                messages.success(request, 'Timezone updated.')
+                return redirect('projects:project_settings')
         elif 'save_language' in request.POST:
             language_form = ProjectLanguageForm(request.POST, instance=project)
             if language_form.is_valid():
@@ -109,6 +123,8 @@ def project_settings(request):
         'name_form': name_form,
         'settings_form': settings_form,
         'language_form': language_form,
+        'publish_time_form': publish_time_form,
+        'timezone_form': timezone_form,
         'project': project,
     })
 

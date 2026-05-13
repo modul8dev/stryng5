@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.conf.global_settings import LANGUAGES
 from django.db import models
@@ -21,6 +23,8 @@ class Project(models.Model):
     enable_facebook = models.BooleanField(default=True)
     enable_instagram = models.BooleanField(default=True)
     product_import_in_progress = models.BooleanField(default=False)
+    default_publish_time = models.TimeField(default=datetime.time(9, 0))
+    timezone = models.CharField(max_length=64, default='UTC')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

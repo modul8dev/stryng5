@@ -1,9 +1,11 @@
 from django import forms
 from django.conf.global_settings import LANGUAGES
+import zoneinfo
 
 from .models import Project
 
 SORTED_LANGUAGES = sorted(LANGUAGES, key=lambda x: x[1])
+TIMEZONE_CHOICES = [(tz, tz) for tz in sorted(zoneinfo.available_timezones())]
 
 
 class ProjectForm(forms.ModelForm):
@@ -15,6 +17,33 @@ class ProjectForm(forms.ModelForm):
                 'class': 'input input-bordered w-full',
                 'placeholder': 'Project name',
             }),
+        }
+
+
+class ProjectTimezoneForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ['timezone']
+        widgets = {
+            'timezone': forms.Select(
+                choices=TIMEZONE_CHOICES,
+                attrs={'class': 'select select-bordered w-full'},
+            ),
+        }
+
+
+class ProjectPublishTimeForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ['default_publish_time']
+        widgets = {
+            'default_publish_time': forms.TimeInput(
+                attrs={
+                    'class': 'input input-bordered w-full',
+                    'type': 'time',
+                },
+                format='%H:%M',
+            ),
         }
 
 

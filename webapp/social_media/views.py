@@ -121,12 +121,34 @@ def post_create(request):
         platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost())
         media_formset = SharedMediaFormSet(request.POST, prefix='media', instance=SocialMediaPost())
         if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
+            from django.utils import timezone
+            import datetime
             post = form.save(commit=False)
             post.user = request.user
             post.project = request.project
             if not post.title:
                 post.title = 'Untitled'
             post.status = 'scheduled' if request.POST.get('action') == 'schedule' and post.scheduled_at else 'draft'
+            if not post.scheduled_at:
+                import zoneinfo
+                publish_time = request.project.default_publish_time
+                project_tz = zoneinfo.ZoneInfo(request.project.timezone)
+                latest = (
+                    SocialMediaPost.objects.filter(project=request.project)
+                    .exclude(scheduled_at=None)
+                    .order_by('-scheduled_at')
+                    .values_list('scheduled_at', flat=True)
+                    .first()
+                )
+                if latest:
+                    base_date = latest.astimezone(project_tz).date()
+                else:
+                    base_date = timezone.now().astimezone(project_tz).date()
+                next_date = base_date + datetime.timedelta(days=1)
+                post.scheduled_at = timezone.make_aware(
+                    datetime.datetime.combine(next_date, publish_time),
+                    project_tz,
+                )
             post.save()
             platform_formset.instance = post
             platform_formset.save()
@@ -407,8 +429,7 @@ def post_unschedule(request, pk):
     """Return a post from scheduled back to draft status."""
     post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
     post.status = 'draft'
-    post.scheduled_at = None
-    post.save(update_fields=['status', 'scheduled_at'])
+    post.save(update_fields=['status'])
     return JsonResponse({'status': 'draft'})
 
 
@@ -427,7 +448,9 @@ def post_schedule(request, pk):
     try:
         scheduled_at = dt_class.fromisoformat(scheduled_at_str)
         if timezone.is_naive(scheduled_at):
-            scheduled_at = timezone.make_aware(scheduled_at)
+            import zoneinfo
+            project_tz = zoneinfo.ZoneInfo(post.project.timezone)
+            scheduled_at = timezone.make_aware(scheduled_at, project_tz)
         if scheduled_at <= timezone.now():
             return JsonResponse({'error': 'Scheduled time must be in the future.'}, status=400)
         post.scheduled_at = scheduled_at

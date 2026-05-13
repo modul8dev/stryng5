@@ -28,6 +28,7 @@ def scheduler_view(request):
     return render(request, 'scheduler/scheduler.html', {
         'platforms': platforms_for_filter,
         'status_choices': STATUS_CHOICES,
+        'project_timezone': request.project.timezone,
     })
 
 
@@ -105,15 +106,15 @@ def scheduler_reschedule(request, pk):
 
         new_dt = datetime.fromisoformat(new_dt_str)
         if timezone.is_naive(new_dt):
-            new_dt = timezone.make_aware(new_dt)
+            import zoneinfo
+            project_tz = zoneinfo.ZoneInfo(post.project.timezone)
+            new_dt = timezone.make_aware(new_dt, project_tz)
 
         if new_dt < timezone.now():
             return JsonResponse({'error': 'Cannot schedule in the past'}, status=400)
 
         post.scheduled_at = new_dt
-        if post.status == 'draft':
-            post.status = 'scheduled'
-        post.save(update_fields=['scheduled_at', 'status', 'updated_at'])
+        post.save(update_fields=['scheduled_at', 'updated_at'])
 
         return JsonResponse({'ok': True})
     except (json.JSONDecodeError, ValueError) as e:

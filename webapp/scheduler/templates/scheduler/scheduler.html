@@ -25,6 +25,7 @@
 
     <!-- Calendar -->
     <div id="scheduler-calendar" class="scheduler-calendar"
-         data-events-url="{% url 'scheduler:scheduler_events' %}"></div>
+         data-events-url="{% url 'scheduler:scheduler_events' %}"
+         data-timezone="{{ project_timezone }}"></div>
 </div>
 {% endblock %}

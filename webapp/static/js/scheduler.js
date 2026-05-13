@@ -9,9 +9,11 @@ function schedulerApp() {
             if (!calendarEl) return;
 
             const eventsUrl = calendarEl.dataset.eventsUrl;
+            const projectTimezone = calendarEl.dataset.timezone || 'local';
             const self = this;
 
             this.calendar = new FullCalendar.Calendar(calendarEl, {
+                timeZone: projectTimezone,
                 initialView: 'dayGridMonth',
                 headerToolbar: {
                     left: 'prev,next today',
