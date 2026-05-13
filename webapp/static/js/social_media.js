@@ -444,29 +444,12 @@ document.addEventListener('alpine:init', () => {
     },
 
     _onGenerationDone(data) {
-      this.generating = false;
-      this.generationStep = '';
-      if (data.processing_status === 'completed') {
-        if (data.shared_text) {
-          this.sharedText = data.shared_text;
-          const ta = this.$root.querySelector('#id_shared_text');
-          if (ta) ta.value = data.shared_text;
-        }
-        if (data.media && data.media.length > 0) {
-          this.sharedMedia = [];
-          for (const m of data.media) {
-            this.sharedMedia.push({
-              mediaId: this._nextTempId(),
-              media: m.id,
-              url: m.url,
-              is_video: m.is_video,
-            });
-          }
-          this.syncSharedMediaFormset();
-          this._resetCarousel();
-        }
-        this.mode = 'editor';
-        this.isDirty = false;
+      if (data.processing_status === 'completed' && data.post_id) {
+        up.navigate('#post-composer', {
+          url: `/social-media/${data.post_id}/edit/`,
+          layer: 'current',
+          history: false,
+        });
       }
     },
 
@@ -727,7 +710,7 @@ document.addEventListener('alpine:init', () => {
         const formData = new FormData(form);
         formData.set('action', action);
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-        const resp = await fetch(form.action || window.location.href, {
+        const resp = await fetch(form.action, {
           method: 'POST',
           body: formData,
           headers: { 'X-CSRFToken': csrfToken },
