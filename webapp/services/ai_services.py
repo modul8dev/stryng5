@@ -289,7 +289,15 @@ def _generate_gemini_media(prompt, input_media=None):
     try:
         for img in (input_media or []):
             if img.file and img.file.name:
-                pil_media.append(_open_as_pil(img.file.path))
+                is_svg = img.file.name.lower().endswith('.svg')
+                with img.file.open('rb') as fh:
+                    raw = fh.read()
+                if is_svg:
+                    import cairosvg
+                    png_bytes = cairosvg.svg2png(bytestring=raw)
+                    pil_media.append(PILImage.open(BytesIO(png_bytes)))
+                else:
+                    pil_media.append(PILImage.open(BytesIO(raw)))
             elif img.external_url:
                 try:
                     resp = requests.get(img.external_url, headers=_browser_headers, timeout=15)
