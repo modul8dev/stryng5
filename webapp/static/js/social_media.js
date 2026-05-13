@@ -210,6 +210,7 @@ document.addEventListener('alpine:init', () => {
     destroy() {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
       document.removeEventListener('post-changed', this._postChangedHandler);
+      if (this._generationSseCleanup) this._generationSseCleanup();
       const postForm = document.getElementById('post-form');
       if (postForm && this._dirtyHandler) {
         postForm.removeEventListener('input', this._dirtyHandler);

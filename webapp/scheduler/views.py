@@ -82,6 +82,7 @@ def scheduler_events(request):
             'start': post.scheduled_at.isoformat(),
             'extendedProps': {
                 'status': post.status,
+                'processingStatus': post.processing_status,
                 'caption': (post.shared_text or '')[:120],
                 'platforms': enabled_platforms,
                 'thumbnail': thumbnail,
@@ -91,6 +92,45 @@ def scheduler_events(request):
         })
 
     return JsonResponse(events, safe=False)
+
+
+@login_required
+@require_GET
+def scheduler_event_detail(request, pk):
+    post = get_object_or_404(
+        SocialMediaPost.objects.prefetch_related('shared_media__media', 'platforms'),
+        pk=pk,
+        project=request.project,
+        scheduled_at__isnull=False,
+    )
+
+    first_media = post.shared_media.first()
+    thumbnail = None
+    is_video = False
+    if first_media:
+        thumbnail = first_media.media.url
+        is_video = first_media.media.is_video
+
+    enabled_platforms = [
+        p.platform
+        for p in post.platforms.all()
+        if p.is_enabled
+    ]
+
+    return JsonResponse({
+        'id': post.pk,
+        'title': post.title,
+        'start': post.scheduled_at.isoformat(),
+        'extendedProps': {
+            'status': post.status,
+            'processingStatus': post.processing_status,
+            'caption': (post.shared_text or '')[:120],
+            'platforms': enabled_platforms,
+            'thumbnail': thumbnail,
+            'isVideo': is_video,
+            'editUrl': reverse('social_media:post_edit', args=[post.pk]),
+        },
+    })
 
 
 @login_required

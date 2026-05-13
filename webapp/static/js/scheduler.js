@@ -53,13 +53,6 @@ function schedulerApp() {
                     const timeText = arg.timeText;
                     const title = arg.event.title;
 
-                    const statusColors = {
-                        draft: 'bg-zinc-200 text-zinc-600',
-                        scheduled: 'bg-amber-400 text-white',
-                        published: 'bg-blue-500 text-white',
-                        failed: 'bg-red-500 text-white',
-                    };
-
                     const platformColors = {
                         linkedin: 'bg-blue-100 text-blue-700',
                         x: 'bg-zinc-200 text-zinc-700',
@@ -74,13 +67,38 @@ function schedulerApp() {
                         instagram: 'Ig',
                     };
 
-                    var sc = statusColors[props.status] || 'bg-zinc-200 text-zinc-600';
+                    function buildStatusBadge(status, processingStatus) {
+                        if (processingStatus === 'generating') {
+                            return '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700 animate-pulse">'
+                                + '<svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">'
+                                + '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
+                                + '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
+                                + '</svg>Generating</span>';
+                        }
+                        var badgeStyles = {
+                            draft:      'bg-zinc-100 text-zinc-600',
+                            scheduled:  'bg-amber-100 text-amber-700',
+                            publishing: 'bg-amber-100 text-amber-700 animate-pulse',
+                            published:  'bg-emerald-100 text-emerald-700',
+                            failed:     'bg-red-100 text-red-700',
+                        };
+                        var badgeLabels = {
+                            draft:      'Draft',
+                            scheduled:  'Scheduled',
+                            publishing: 'Publishing\u2026',
+                            published:  'Published',
+                            failed:     'Failed',
+                        };
+                        var bc = badgeStyles[status] || 'bg-zinc-100 text-zinc-600';
+                        var bl = badgeLabels[status] || self.escapeHtml(status);
+                        return '<span class="inline-flex items-center rounded-full ' + bc + ' px-2.5 py-0.5 text-xs font-medium">' + bl + '</span>';
+                    }
 
                     let html = '<div class="scheduler-event-card">';
 
                     // Header: status badge + time
                     html += '<div class="scheduler-event-header">';
-                    html += '<span class="scheduler-event-status ' + sc + '">' + self.escapeHtml(props.status) + '</span>';
+                    html += buildStatusBadge(props.status, props.processingStatus);
                     if (timeText) {
                         html += '<span class="scheduler-event-time">' + self.escapeHtml(timeText) + '</span>';
                     }
@@ -178,6 +196,65 @@ function schedulerApp() {
             });
 
             this.calendar.render();
+
+            // Listen for SSE post-changed events and surgically update the
+            // matching calendar event without triggering a full refetch.
+            this._postChangedHandler = function(e) {
+                var detail = e.detail || {};
+                var postId = detail.post_id;
+                if (!postId) return;
+
+                var fcEvent = self.calendar.getEventById(postId);
+                if (!fcEvent) return; // event not in the current view range — ignore
+
+                fetch('/scheduler/api/event/' + postId + '/')
+                    .then(function(r) {
+                        if (!r.ok) {
+                            // Post may have been unscheduled; remove it from the calendar
+                            if (r.status === 404) fcEvent.remove();
+                            return null;
+                        }
+                        return r.json();
+                    })
+                    .then(function(data) {
+                        if (!data) return;
+                        // Update start time (handles reschedules)
+                        fcEvent.setStart(data.start);
+                        // Update all extendedProps so eventContent re-renders correctly
+                        var ep = data.extendedProps || {};
+                        Object.keys(ep).forEach(function(key) {
+                            fcEvent.setExtendedProp(key, ep[key]);
+                        });
+                    })
+                    .catch(function() {}); // best-effort; ignore transient errors
+            };
+            document.addEventListener('post-changed', this._postChangedHandler);
+
+            // Listen for generation-done SSE events to instantly reflect
+            // processingStatus changes without waiting for a full re-fetch.
+            this._generationDoneHandler = function(e) {
+                var detail = e.detail || {};
+                var postId = detail.post_id;
+                if (!postId) return;
+                var fcEvent = self.calendar.getEventById(postId);
+                if (!fcEvent) return;
+                fcEvent.setExtendedProp('processingStatus', detail.processing_status || 'idle');
+            };
+            document.addEventListener('generation-done', this._generationDoneHandler);
+
+            // Clean up on Unpoly layer dismissal / navigation
+            document.addEventListener('up:location:changed', this._removePostChangedHandler.bind(this), { once: true });
+        },
+
+        _removePostChangedHandler() {
+            if (this._postChangedHandler) {
+                document.removeEventListener('post-changed', this._postChangedHandler);
+                this._postChangedHandler = null;
+            }
+            if (this._generationDoneHandler) {
+                document.removeEventListener('generation-done', this._generationDoneHandler);
+                this._generationDoneHandler = null;
+            }
         },
 
         refetch() {
