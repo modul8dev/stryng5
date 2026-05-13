@@ -88,36 +88,25 @@ def project_settings(request):
     timezone_form = ProjectTimezoneForm(instance=project)
 
     if request.method == 'POST':
-        if 'save_name' in request.POST:
-            name_form = ProjectForm(request.POST, instance=project)
-            if name_form.is_valid():
-                name_form.save()
-                messages.success(request, 'Project name updated.')
-                return redirect('projects:project_settings')
-        elif 'save_platforms' in request.POST:
-            settings_form = ProjectSettingsForm(request.POST, instance=project)
-            if settings_form.is_valid():
-                settings_form.save()
-                messages.success(request, 'Platform settings saved.')
-                return redirect('projects:project_settings')
-        elif 'save_publish_time' in request.POST:
-            publish_time_form = ProjectPublishTimeForm(request.POST, instance=project)
-            if publish_time_form.is_valid():
-                publish_time_form.save()
-                messages.success(request, 'Default publish time updated.')
-                return redirect('projects:project_settings')
-        elif 'save_timezone' in request.POST:
-            timezone_form = ProjectTimezoneForm(request.POST, instance=project)
-            if timezone_form.is_valid():
-                timezone_form.save()
-                messages.success(request, 'Timezone updated.')
-                return redirect('projects:project_settings')
-        elif 'save_language' in request.POST:
-            language_form = ProjectLanguageForm(request.POST, instance=project)
-            if language_form.is_valid():
-                language_form.save()
-                messages.success(request, 'Content language updated.')
-                return redirect('projects:project_settings')
+        name_form = ProjectForm(request.POST, instance=project)
+        settings_form = ProjectSettingsForm(request.POST, instance=project)
+        language_form = ProjectLanguageForm(request.POST, instance=project)
+        publish_time_form = ProjectPublishTimeForm(request.POST, instance=project)
+        timezone_form = ProjectTimezoneForm(request.POST, instance=project)
+        if all([
+            name_form.is_valid(),
+            settings_form.is_valid(),
+            language_form.is_valid(),
+            publish_time_form.is_valid(),
+            timezone_form.is_valid(),
+        ]):
+            name_form.save()
+            settings_form.save()
+            language_form.save()
+            publish_time_form.save()
+            timezone_form.save()
+            messages.success(request, 'Project settings saved.')
+            return redirect('projects:project_settings')
 
     return render(request, 'projects/project_settings.html', {
         'name_form': name_form,

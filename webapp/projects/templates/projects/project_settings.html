@@ -19,168 +19,147 @@
     </div>
     {% endif %}
 
-    <!-- Project Name -->
-    <div class="rounded-2xl border border-zinc-200 bg-white p-8">
-        <div class="mb-6">
-            <h3 class="text-sm font-medium text-zinc-900">Project Name</h3>
-            <p class="mt-1 text-sm text-zinc-500">Rename this project.</p>
-        </div>
-        <form method="post" action="{% url 'projects:project_settings' %}">
-            {% csrf_token %}
+    <!-- Settings Card -->
+    <form method="post" action="{% url 'projects:project_settings' %}">
+        {% csrf_token %}
+        <div class="rounded-2xl border border-zinc-200 bg-white p-8 space-y-8">
+
+            <!-- Project Name -->
             <div>
-                <label for="{{ name_form.name.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Name</label>
-                {{ name_form.name }}
-                {% if name_form.name.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ name_form.name.errors.0 }}</p>
-                {% endif %}
+                <h3 class="text-sm font-medium text-zinc-900">Project Name</h3>
+                <p class="mt-1 text-sm text-zinc-500">Rename this project.</p>
+                <div class="mt-4">
+                    <label for="{{ name_form.name.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Name</label>
+                    {{ name_form.name }}
+                    {% if name_form.name.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ name_form.name.errors.0 }}</p>
+                    {% endif %}
+                </div>
             </div>
-            <div class="mt-6 flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
-                <button type="submit" name="save_name" class="btn btn-primary rounded-lg text-sm">Save name</button>
-            </div>
-        </form>
-    </div>
 
-    <!-- Content Language -->
-    <div class="mt-6 rounded-2xl border border-zinc-200 bg-white p-8">
-        <div class="mb-6">
-            <h3 class="text-sm font-medium text-zinc-900">Content Language</h3>
-            <p class="mt-1 text-sm text-zinc-500">All AI-generated content (posts, topics, brand summaries) will be written in this language.</p>
-        </div>
-        <form method="post" action="{% url 'projects:project_settings' %}">
-            {% csrf_token %}
+            <div class="border-t border-zinc-100"></div>
+
+            <!-- Content Language -->
             <div>
-                <label for="{{ language_form.language.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Language</label>
-                {{ language_form.language }}
-                {% if language_form.language.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ language_form.language.errors.0 }}</p>
-                {% endif %}
+                <h3 class="text-sm font-medium text-zinc-900">Content Language</h3>
+                <p class="mt-1 text-sm text-zinc-500">All AI-generated content (posts, topics, brand summaries) will be written in this language.</p>
+                <div class="mt-4">
+                    <label for="{{ language_form.language.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Language</label>
+                    {{ language_form.language }}
+                    {% if language_form.language.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ language_form.language.errors.0 }}</p>
+                    {% endif %}
+                </div>
             </div>
-            <div class="mt-6 flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
-                <button type="submit" name="save_language" class="btn btn-primary rounded-lg text-sm">Save language</button>
-            </div>
-        </form>
-    </div>
 
-    <!-- Social Media Platforms -->
-    <div class="mt-6 rounded-2xl border border-zinc-200 bg-white p-8">
-        <div class="mb-6">
-            <h3 class="text-sm font-medium text-zinc-900">Social Media Platforms</h3>
-            <p class="mt-1 text-sm text-zinc-500">Enable the platforms you want to post to for this project. Only enabled platforms will appear in the post composer.</p>
-        </div>
-        <form method="post" action="{% url 'projects:project_settings' %}">
-            {% csrf_token %}
-            <div class="space-y-4">
-                <!-- LinkedIn -->
-                <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
-                    <div class="flex items-center gap-3">
-                        <div class="flex size-9 items-center justify-center rounded-lg bg-blue-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-blue-700" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19M18.5 18.5V13.2A3.26 3.26 0 0 0 15.24 9.94C14.39 9.94 13.4 10.46 12.92 11.24V10.13H10.13V18.5H12.92V13.57C12.92 12.8 13.54 12.17 14.31 12.17A1.4 1.4 0 0 1 15.71 13.57V18.5H18.5M6.88 8.56A1.68 1.68 0 0 0 8.56 6.88C8.56 5.95 7.81 5.19 6.88 5.19A1.69 1.69 0 0 0 5.19 6.88C5.19 7.81 5.95 8.56 6.88 8.56M8.27 18.5V10.13H5.5V18.5H8.27Z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-zinc-900">LinkedIn</p>
-                            <p class="text-xs text-zinc-500">Up to 3,000 characters · 9 media</p>
-                        </div>
-                    </div>
-                    {{ settings_form.enable_linkedin }}
-                </label>
+            <div class="border-t border-zinc-100"></div>
 
-                <!-- X (Twitter) -->
-                <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
-                    <div class="flex items-center gap-3">
-                        <div class="flex size-9 items-center justify-center rounded-lg bg-zinc-900">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.849L1.254 2.25H8.08l4.259 5.63 5.905-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-zinc-900">X (Twitter)</p>
-                            <p class="text-xs text-zinc-500">Up to 280 characters · 4 media</p>
-                        </div>
-                    </div>
-                    {{ settings_form.enable_x }}
-                </label>
-
-                <!-- Facebook -->
-                <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
-                    <div class="flex items-center gap-3">
-                        <div class="flex size-9 items-center justify-center rounded-lg bg-blue-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-zinc-900">Facebook</p>
-                            <p class="text-xs text-zinc-500">Up to 63,206 characters · 10 media</p>
-                        </div>
-                    </div>
-                    {{ settings_form.enable_facebook }}
-                </label>
-
-                <!-- Instagram -->
-                <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
-                    <div class="flex items-center gap-3">
-                        <div class="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-pink-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8A1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-zinc-900">Instagram</p>
-                            <p class="text-xs text-zinc-500">Up to 2,200 characters · 10 media</p>
-                        </div>
-                    </div>
-                    {{ settings_form.enable_instagram }}
-                </label>
-            </div>
-            <div class="mt-8 flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
-                <button type="submit" name="save_platforms" class="btn btn-primary rounded-lg text-sm">Save platforms</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Timezone -->
-    <div class="mt-6 rounded-2xl border border-zinc-200 bg-white p-8">
-        <div class="mb-6">
-            <h3 class="text-sm font-medium text-zinc-900">Timezone</h3>
-            <p class="mt-1 text-sm text-zinc-500">All scheduled times (including the default publish time below) are interpreted in this timezone.</p>
-        </div>
-        <form method="post" action="{% url 'projects:project_settings' %}">
-            {% csrf_token %}
+            <!-- Social Media Platforms -->
             <div>
-                <label for="{{ timezone_form.timezone.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Timezone</label>
-                {{ timezone_form.timezone }}
-                {% if timezone_form.timezone.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ timezone_form.timezone.errors.0 }}</p>
-                {% endif %}
-            </div>
-            <div class="mt-6 flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
-                <button type="submit" name="save_timezone" class="btn btn-primary rounded-lg text-sm">Save timezone</button>
-            </div>
-        </form>
-    </div>
+                <h3 class="text-sm font-medium text-zinc-900">Social Media Platforms</h3>
+                <p class="mt-1 text-sm text-zinc-500">Enable the platforms you want to post to for this project. Only enabled platforms will appear in the post composer.</p>
+                <div class="mt-4 space-y-4">
+                    <!-- LinkedIn -->
+                    <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-9 items-center justify-center rounded-lg bg-blue-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-blue-700" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19M18.5 18.5V13.2A3.26 3.26 0 0 0 15.24 9.94C14.39 9.94 13.4 10.46 12.92 11.24V10.13H10.13V18.5H12.92V13.57C12.92 12.8 13.54 12.17 14.31 12.17A1.4 1.4 0 0 1 15.71 13.57V18.5H18.5M6.88 8.56A1.68 1.68 0 0 0 8.56 6.88C8.56 5.95 7.81 5.19 6.88 5.19A1.69 1.69 0 0 0 5.19 6.88C5.19 7.81 5.95 8.56 6.88 8.56M8.27 18.5V10.13H5.5V18.5H8.27Z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900">LinkedIn</p>
+                                <p class="text-xs text-zinc-500">Up to 3,000 characters · 9 media</p>
+                            </div>
+                        </div>
+                        {{ settings_form.enable_linkedin }}
+                    </label>
 
-    <!-- Default Publish Time -->
-    <div class="mt-6 rounded-2xl border border-zinc-200 bg-white p-8">
-        <div class="mb-6">
-            <h3 class="text-sm font-medium text-zinc-900">Default Publish Time</h3>
-            <p class="mt-1 text-sm text-zinc-500">When creating a post without a specific time, it will be scheduled using this time. New posts are placed one day after the latest scheduled post.</p>
-        </div>
-        <form method="post" action="{% url 'projects:project_settings' %}">
-            {% csrf_token %}
+                    <!-- X (Twitter) -->
+                    <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-9 items-center justify-center rounded-lg bg-zinc-900">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.849L1.254 2.25H8.08l4.259 5.63 5.905-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900">X (Twitter)</p>
+                                <p class="text-xs text-zinc-500">Up to 280 characters · 4 media</p>
+                            </div>
+                        </div>
+                        {{ settings_form.enable_x }}
+                    </label>
+
+                    <!-- Facebook -->
+                    <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-9 items-center justify-center rounded-lg bg-blue-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900">Facebook</p>
+                                <p class="text-xs text-zinc-500">Up to 63,206 characters · 10 media</p>
+                            </div>
+                        </div>
+                        {{ settings_form.enable_facebook }}
+                    </label>
+
+                    <!-- Instagram -->
+                    <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-pink-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8A1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900">Instagram</p>
+                                <p class="text-xs text-zinc-500">Up to 2,200 characters · 10 media</p>
+                            </div>
+                        </div>
+                        {{ settings_form.enable_instagram }}
+                    </label>
+                </div>
+            </div>
+
+            <div class="border-t border-zinc-100"></div>
+
+            <!-- Timezone -->
             <div>
-                <label for="{{ publish_time_form.default_publish_time.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Time</label>
-                {{ publish_time_form.default_publish_time }}
-                {% if publish_time_form.default_publish_time.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ publish_time_form.default_publish_time.errors.0 }}</p>
-                {% endif %}
+                <h3 class="text-sm font-medium text-zinc-900">Timezone</h3>
+                <p class="mt-1 text-sm text-zinc-500">All scheduled times (including the default publish time below) are interpreted in this timezone.</p>
+                <div class="mt-4">
+                    <label for="{{ timezone_form.timezone.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Timezone</label>
+                    {{ timezone_form.timezone }}
+                    {% if timezone_form.timezone.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ timezone_form.timezone.errors.0 }}</p>
+                    {% endif %}
+                </div>
             </div>
-            <div class="mt-6 flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
-                <button type="submit" name="save_publish_time" class="btn btn-primary rounded-lg text-sm">Save time</button>
+
+            <div class="border-t border-zinc-100"></div>
+
+            <!-- Default Publish Time -->
+            <div>
+                <h3 class="text-sm font-medium text-zinc-900">Default Publish Time</h3>
+                <p class="mt-1 text-sm text-zinc-500">When creating a post without a specific time, it will be scheduled using this time. New posts are placed one day after the latest scheduled post.</p>
+                <div class="mt-4">
+                    <label for="{{ publish_time_form.default_publish_time.id_for_label }}" class="mb-1 block text-sm font-medium text-zinc-700">Time</label>
+                    {{ publish_time_form.default_publish_time }}
+                    {% if publish_time_form.default_publish_time.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ publish_time_form.default_publish_time.errors.0 }}</p>
+                    {% endif %}
+                </div>
             </div>
-        </form>
-    </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-zinc-100 pt-6">
+                <button type="submit" class="btn btn-primary rounded-lg text-sm">Save settings</button>
+            </div>
+        </div>
+    </form>
 
     <!-- Danger Zone -->
     <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-8">
