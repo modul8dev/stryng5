@@ -262,7 +262,6 @@ document.addEventListener('alpine:init', () => {
     allowVideo: true,
     search: '',
     typeFilter: 'all',
-    showSelectedOnly: false,
     _refreshUrl: '',
     _createUrl: '',
     _editUrlBase: '',
@@ -330,18 +329,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     selectGroup(group) {
-      const isNew = this.currentGroupId !== group.id;
       this.currentGroupId = group.id;
-      // Auto-select first allowed media item when switching to a new group (uses FIFO if at limit)
-      if (isNew) {
-        const allowed = this._allowedMedia(group.media);
-        if (allowed.length > 0) {
-          const firstId = allowed[0].id;
-          if (!this.selected[firstId]) {
-            this._addToSelection(firstId);
-          }
-        }
-      }
     },
 
     isSelected(media) {
@@ -393,7 +381,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     sidebarMedia() {
-      return this.showSelectedOnly ? this.allSelectedMedia() : this.currentMedia();
+      return this.currentMedia();
     },
 
     editGroup(groupId) {

@@ -63,7 +63,7 @@
                  class="flex items-center justify-center h-full text-sm text-zinc-400">
                 No groups match your search.
             </div>
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-4 gap-3">
                 <template x-for="group in filteredGroups()" :key="group.id">
                     <div @click="selectGroup(group)"
                          class="flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all cursor-pointer"
@@ -93,10 +93,7 @@
                                     </svg>
                                 </div>
                             </template>
-                            {# Type badge #}
-                            <span class="absolute top-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                  :class="group.type === 'product' ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-500'"
-                                  x-text="group.type"></span>
+
                         </div>
                         {# Group name + count + edit button #}
                         <div class="px-3 py-2.5 flex items-start justify-between gap-1">
@@ -119,30 +116,20 @@
         </div>
 
         {# Right: Media thumbnails sidebar #}
-        <div class="w-56 shrink-0 border-l border-zinc-200 flex flex-col overflow-hidden">
-            {# Sidebar header: selected-only toggle #}
-            <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-100 bg-zinc-50 shrink-0">
+        <div class="w-80 shrink-0 border-l border-zinc-200 flex flex-col overflow-hidden">
+            {# Sidebar header #}
+            <div class="flex items-center px-3 py-2 border-b border-zinc-100 bg-zinc-50 shrink-0">
                 <p class="text-xs font-medium text-zinc-500 truncate"
-                   x-text="showSelectedOnly ? 'Selected' : (currentGroupId ? currentGroupTitle() : 'Media')"></p>
-                <button type="button"
-                        @click="showSelectedOnly = !showSelectedOnly"
-                        title="Show selected media"
-                        :class="showSelectedOnly ? 'bg-indigo-600 text-white border-transparent' : 'bg-white text-zinc-500 border-zinc-200 hover:border-indigo-300'"
-                        class="flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors shrink-0 ml-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    <span x-text="selectedCount()"></span>
-                </button>
+                   x-text="currentGroupId ? currentGroupTitle() : 'Media'"></p>
             </div>
             {# No group hint #}
-            <div x-show="!showSelectedOnly && !currentGroupId"
+            <div x-show="!currentGroupId"
                  class="flex flex-1 items-center justify-center p-4">
                 <p class="text-xs text-zinc-400 text-center">Click a group to browse its media</p>
             </div>
             {# Media grid #}
-            <div x-show="showSelectedOnly || currentGroupId" class="overflow-y-auto flex-1 p-3">
-                <div class="grid grid-cols-3 gap-1.5">
+            <div x-show="currentGroupId" class="overflow-y-auto flex-1 p-3">
+                <div class="grid grid-cols-2 gap-2">
                     <template x-for="img in sidebarMedia()" :key="img.id">
                         <button type="button"
                                 @click="toggle(img.id)"
@@ -159,7 +146,7 @@
                             <div x-show="isSelected(img.id)"
                                  class="absolute inset-0 bg-indigo-500/20 flex items-end justify-end p-0.5">
                                 <div class="bg-indigo-500 rounded-full p-0.5">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                                     </svg>
                                 </div>
@@ -167,24 +154,42 @@
                         </button>
                     </template>
                     <p x-show="sidebarMedia().length === 0"
-                       class="col-span-3 text-xs text-zinc-400 py-2 text-center"
-                       x-text="showSelectedOnly ? 'No media selected.' : (allowVideo ? 'No media in this group.' : 'No media in this group.')"></p>
+                       class="col-span-2 text-xs text-zinc-400 py-2 text-center">No media in this group.</p>
                 </div>
             </div>
         </div>
     </div>
 
     {# Footer #}
-    <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200 shrink-0 bg-zinc-50">
-        <div class="flex items-center gap-2">
+    <div class="flex items-center gap-3 px-4 py-3 border-t border-zinc-200 shrink-0 bg-zinc-50">
+        {# Selected thumbnails #}
+        <div class="flex items-center gap-1.5 flex-1 overflow-x-auto min-w-0">
+            <template x-for="img in allSelectedMedia()" :key="img.id">
+                <div class="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-indigo-400 group">
+                    <template x-if="!img.is_video">
+                        <img :src="img.url" class="w-full h-full object-cover" />
+                    </template>
+                    <template x-if="img.is_video">
+                        <video :src="img.url" class="w-full h-full object-cover" muted preload="metadata" playsinline></video>
+                    </template>
+                    <button type="button" @click="toggle(img.id)"
+                            class="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </template>
+            <span x-show="selectedCount() === 0" class="text-sm text-zinc-400">No media selected</span>
+        </div>
+        {# Count + warning + buttons #}
+        <div class="flex items-center gap-2 shrink-0">
             <span class="text-sm text-zinc-500"
-                  x-text="selectedCount() + (maxMedia > 0 ? ' / ' + maxMedia : '') + ' item' + (selectedCount() !== 1 ? 's' : '') + ' selected'"></span>
+                  x-text="selectedCount() + (maxMedia > 0 ? ' / ' + maxMedia : '') + ' item' + (selectedCount() !== 1 ? 's' : '')"></span>
             <span x-show="atMax()"
                   class="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                 Selecting more will replace oldest
             </span>
-        </div>
-        <div class="flex items-center gap-2">
             <button type="button" @click="cancel()"
                     class="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
                 Cancel
