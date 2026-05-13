@@ -413,17 +413,6 @@ def post_publish(request, pk):
 
 
 @login_required
-def post_publish_info(request, pk):
-    """Return publish info fragment for the given post (shown in modal)."""
-    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
-    platforms = post.platforms.filter(is_enabled=True)
-    return render(request, 'social_media/post_publish_info.html', {
-        'post': post,
-        'platforms': platforms,
-    })
-
-
-@login_required
 @require_POST
 def post_unschedule(request, pk):
     """Return a post from scheduled back to draft status."""
