@@ -58,8 +58,12 @@ def _save_platform_override_media(request, post):
             continue
         platform_variant.override_media.all().delete()
         for sort_order, item in enumerate(media_data):
-            media = item.get('media')
-            if media:
+            media_id = item.get('media') if isinstance(item, dict) else item
+            if media_id:
+                try:
+                    media = Media.objects.get(pk=media_id)
+                except Media.DoesNotExist:
+                    continue
                 SocialMediaPlatformMedia.objects.create(
                     platform_variant=platform_variant,
                     media=media,
@@ -303,6 +307,44 @@ def _get_project_brand(project):
         return None
 
 
+def _validate_post_for_publish(post):
+    """Validate per-platform media constraints before publishing or scheduling.
+
+    Returns a list of error strings (empty list means valid).
+    """
+    PLATFORM_LABELS = dict(PLATFORM_CHOICES)
+    errors = []
+
+    for platform in (
+        post.platforms
+        .filter(is_enabled=True)
+        .prefetch_related('override_media__media', 'post__shared_media__media')
+    ):
+        label = PLATFORM_LABELS.get(platform.platform, platform.platform)
+        media_qs = platform.get_effective_media().select_related('media')
+        media = list(media_qs)
+        text = platform.get_effective_text()
+
+        videos = [m for m in media if m.media.is_video]
+        images = [m for m in media if not m.media.is_video]
+
+        if not text.strip() and not media:
+            errors.append(f'{label}: Post must have either text or media.')
+            continue
+
+        if videos and images:
+            errors.append(f'{label}: Cannot mix images and videos in the same post.')
+            continue
+
+        if len(videos) > 1:
+            errors.append(f'{label}: Only one video is allowed per post.')
+
+        if len(images) > 4:
+            errors.append(f'{label}: Maximum 4 images are allowed per post.')
+
+    return errors
+
+
 def _enqueue_generation(request, post):
     """Validate credits, mark the post as generating and enqueue the task.
     Returns a JsonResponse if an error occurs, otherwise None."""
@@ -406,6 +448,11 @@ def ai_edit_text(request):
 def post_publish(request, pk):
     """Enqueue an async task to publish the post to all connected platforms."""
     post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+
+    errors = _validate_post_for_publish(post)
+    if errors:
+        return JsonResponse({'error': errors[0], 'validation_errors': errors}, status=400)
+
     base_url = request.build_absolute_uri('/').rstrip('/')
     from django_q.tasks import async_task
     async_task('social_media.tasks.publish_post_task', post.pk, base_url)
@@ -442,6 +489,11 @@ def post_schedule(request, pk):
             scheduled_at = timezone.make_aware(scheduled_at, project_tz)
         if scheduled_at <= timezone.now():
             return JsonResponse({'error': 'Scheduled time must be in the future.'}, status=400)
+
+        errors = _validate_post_for_publish(post)
+        if errors:
+            return JsonResponse({'error': errors[0], 'validation_errors': errors}, status=400)
+
         post.scheduled_at = scheduled_at
         post.status = 'scheduled'
         post.save(update_fields=['scheduled_at', 'status'])

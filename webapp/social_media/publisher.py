@@ -48,10 +48,14 @@ def _get_absolute_media_url(media_item, base_url):
     """
     Return a publicly accessible URL for a media item.
     For local Django-stored files the base_url is prepended to the storage-relative URL.
+    If the storage backend already returns an absolute URL (e.g. S3), use it as-is.
     """
     if media_item.external_url:
         return media_item.external_url
-    return base_url.rstrip('/') + media_item.file.url
+    file_url = media_item.file.url
+    if file_url.startswith(('http://', 'https://')):
+        return file_url
+    return base_url.rstrip('/') + file_url
 
 
 # Keep old names as aliases for any code that hasn't been updated yet.
@@ -155,7 +159,7 @@ def publish_to_linkedin(platform_variant, connection, base_url=''):
             init_resp.raise_for_status()
             init_data = init_resp.json()
             upload_url = init_data['value']['uploadUrl']
-            image_urn = init_data['value']['media']
+            image_urn = init_data['value']['image']
 
             # Step 2 — upload binary
             put_resp = http_requests.put(
@@ -342,14 +346,25 @@ def publish_to_facebook(platform_variant, connection, base_url=''):
     # Check if first item is a video — Facebook video posts take a single video
     first_media = media[0].media
     if first_media.is_video:
-        media_data, content_type = _get_media_bytes_and_type(first_media)
-        resp = http_requests.post(
-            f'{GRAPH_API_BASE}/{page_id}/videos',
-            data={'description': text, 'access_token': access_token},
-            files={'source': ('video', media_data, content_type)},
-            timeout=180,
-        )
-        resp.raise_for_status()
+        video_url = _get_absolute_media_url(first_media, base_url)
+        # If the video is already on a public URL (e.g. S3), use file_url to avoid
+        # downloading and re-uploading potentially large files.
+        if video_url.startswith(('http://', 'https://')):
+            resp = http_requests.post(
+                f'{GRAPH_API_BASE}/{page_id}/videos',
+                data={'description': text, 'access_token': access_token, 'file_url': video_url},
+                timeout=60,
+            )
+        else:
+            media_data, content_type = _get_media_bytes_and_type(first_media)
+            resp = http_requests.post(
+                f'{GRAPH_API_BASE}/{page_id}/videos',
+                data={'description': text, 'access_token': access_token},
+                files={'source': ('video', media_data, content_type)},
+                timeout=180,
+            )
+        if not resp.ok:
+            raise RuntimeError(f'Facebook video upload failed ({resp.status_code}): {resp.text}')
         video_id = resp.json().get('id', '')
         return f'https://www.facebook.com/{video_id}' if video_id else ''
     elif len(media) == 1:
@@ -450,7 +465,8 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
             },
             timeout=30,
         )
-        container_resp.raise_for_status()
+        if not container_resp.ok:
+            raise RuntimeError(f'Instagram Reels container failed ({container_resp.status_code}): {container_resp.text}')
         container_id = container_resp.json()['id']
     elif len(media) == 1:
         image_url = _get_absolute_media_url(first_media, base_url)
@@ -458,12 +474,14 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
             f'{IG_GRAPH_BASE}/{ig_user_id}/media',
             data={
                 'image_url': image_url,
+                'media_type': 'IMAGE',
                 'caption': text,
                 'access_token': access_token,
             },
             timeout=30,
         )
-        container_resp.raise_for_status()
+        if not container_resp.ok:
+            raise RuntimeError(f'Instagram image container failed ({container_resp.status_code}): {container_resp.text}')
         container_id = container_resp.json()['id']
     else:
         # Carousel: create one item container per media first
@@ -480,7 +498,8 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
                 },
                 timeout=30,
             )
-            item_resp.raise_for_status()
+            if not item_resp.ok:
+                raise RuntimeError(f'Instagram carousel item failed ({item_resp.status_code}): {item_resp.text}')
             item_ids.append(item_resp.json()['id'])
 
         carousel_resp = http_requests.post(
@@ -493,7 +512,8 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
             },
             timeout=30,
         )
-        carousel_resp.raise_for_status()
+        if not carousel_resp.ok:
+            raise RuntimeError(f'Instagram carousel container failed ({carousel_resp.status_code}): {carousel_resp.text}')
         container_id = carousel_resp.json()['id']
 
     # Wait for the container to finish processing before publishing
@@ -509,6 +529,17 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
         timeout=30,
     )
     publish_resp.raise_for_status()
+    media_id = publish_resp.json().get('id', '')
+
+    # Fetch the permalink so it can be stored and displayed.
+    if media_id:
+        permalink_resp = http_requests.get(
+            f'{IG_GRAPH_BASE}/{media_id}',
+            params={'fields': 'permalink', 'access_token': access_token},
+            timeout=15,
+        )
+        if permalink_resp.ok:
+            return permalink_resp.json().get('permalink', '')
     return ''
 
 

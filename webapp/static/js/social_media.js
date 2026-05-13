@@ -671,6 +671,57 @@ document.addEventListener('alpine:init', () => {
     publishUrl: null,
     publishPanelUrl: null,
 
+    // ── Publish validation ────────────────────────────────────────────────
+
+    /**
+     * Validate media constraints for every active platform.
+     * Returns an array of human-readable error strings (empty = valid).
+     */
+    validateForPublish() {
+      const PLATFORM_LABELS = {
+        linkedin: 'LinkedIn',
+        x: 'X (Twitter)',
+        facebook: 'Facebook',
+        instagram: 'Instagram',
+      };
+
+      const errors = [];
+      this.$el.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
+        const platform = panel.id.replace('panel-', '');
+        const label = PLATFORM_LABELS[platform] || platform;
+
+        const media = this.overrideMediaShown[platform]
+          ? (this.platformMedia[platform] || [])
+          : this.sharedMedia;
+        const text = this.overrideTextShown[platform]
+          ? (this.overrideText[platform] || '')
+          : this.sharedText;
+
+        const videos = media.filter(m => m.is_video);
+        const images = media.filter(m => !m.is_video);
+
+        if (!text.trim() && media.length === 0) {
+          errors.push(`${label}: Post must have either text or media.`);
+          return;
+        }
+
+        if (videos.length > 0 && images.length > 0) {
+          errors.push(`${label}: Cannot mix images and videos in the same post.`);
+          return;
+        }
+
+        if (videos.length > 1) {
+          errors.push(`${label}: Only one video is allowed per post.`);
+        }
+
+        if (images.length > 4) {
+          errors.push(`${label}: Maximum 4 images are allowed per post.`);
+        }
+      });
+
+      return errors;
+    },
+
     // ── Drag-and-drop state ───────────────────────────────────────────────
     dragSourceIndex: null,
     dragSourceType: null,
@@ -723,6 +774,7 @@ document.addEventListener('alpine:init', () => {
         if (closeOnSuccess) {
           up.layer.accept();
         }
+        this.isDirty = false;
         return true;
       } finally {
         this.saving = false;
@@ -824,15 +876,17 @@ document.addEventListener('alpine:init', () => {
     postStatus: '',
     scheduledAt: '',
     scheduleError: '',
+    validationErrors: [],
     scheduling: false,
     unscheduling: false,
     publishing: false,
-    liveResults: [],       // [{platform, success, error}] — set after SSE publish-done
 
     postId: null,
     publishUrl: null,
     scheduleUrl: null,
     unscheduleUrl: null,
+    panelUrl: null,
+    _sseCleanup: null,
 
     // ── Lifecycle ────────────────────────────────────────────────────────
     init() {
@@ -848,6 +902,8 @@ document.addEventListener('alpine:init', () => {
       this.publishUrl    = this.$el.dataset.publishUrl;
       this.scheduleUrl   = this.$el.dataset.scheduleUrl;
       this.unscheduleUrl = this.$el.dataset.unscheduleUrl;
+      this.panelUrl      = this.$el.dataset.panelUrl;
+      this._ownLayer     = up.layer.current;
 
       // Determine initial view from current post status
       if (this.postStatus === 'published' || this.postStatus === 'failed') {
@@ -883,9 +939,45 @@ document.addEventListener('alpine:init', () => {
       return formatScheduledAt(iso);
     },
 
+    // ── Pre-publish validation via parent composer ─────────────────────────
+    async _validateViaComposer() {
+      try {
+        const parentEl = this._ownLayer?.parent?.element;
+        if (!parentEl) return [];
+        const composerEl = parentEl.querySelector('[x-data]');
+        if (!composerEl) return [];
+        const composer = Alpine.$data(composerEl);
+        if (composer && typeof composer.validateForPublish === 'function') {
+          return composer.validateForPublish();
+        }
+      } catch (e) {
+        console.warn('publishPanel: could not validate via composer', e);
+      }
+      return [];
+    },
+
+    // ── Save parent post ───────────────────────────────────────────────────
+    async _saveParentPost() {
+      // The publish panel opens as a child layer over the post composer.
+      // Walk up the layer stack to find the postComposer Alpine component and save.
+      try {
+        const parentEl = this._ownLayer?.parent?.element;
+        if (!parentEl) return;
+        const composerEl = parentEl.querySelector('[x-data]');
+        if (!composerEl) return;
+        const composer = Alpine.$data(composerEl);
+        if (composer && typeof composer.savePost === 'function') {
+          await composer.savePost(false, 'draft');
+        }
+      } catch (e) {
+        console.warn('publishPanel: could not save parent post', e);
+      }
+    },
+
     // ── Schedule ─────────────────────────────────────────────────────────
     async schedulePost() {
       this.scheduleError = '';
+      this.validationErrors = [];
       if (!this.scheduledAt) {
         this.scheduleError = 'Please enter a date and time.';
         return;
@@ -900,7 +992,14 @@ document.addEventListener('alpine:init', () => {
         return;
       }
 
+      const validationErrs = await this._validateViaComposer();
+      if (validationErrs.length > 0) {
+        this.validationErrors = validationErrs;
+        return;
+      }
+
       this.scheduling = true;
+      await this._saveParentPost();
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
         || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
       try {
@@ -913,7 +1012,11 @@ document.addEventListener('alpine:init', () => {
         });
         const data = await resp.json();
         if (!resp.ok) {
-          this.scheduleError = data.error || 'Failed to schedule.';
+          if (data.validation_errors && data.validation_errors.length) {
+            this.validationErrors = data.validation_errors;
+          } else {
+            this.scheduleError = data.error || 'Failed to schedule.';
+          }
           return;
         }
         this.postStatus = data.status;
@@ -948,8 +1051,17 @@ document.addEventListener('alpine:init', () => {
     // ── Publish Now ───────────────────────────────────────────────────────
     async publishNow() {
       if (this.publishing || !this.publishUrl) return;
+      this.validationErrors = [];
+
+      const validationErrs = await this._validateViaComposer();
+      if (validationErrs.length > 0) {
+        this.validationErrors = validationErrs;
+        return;
+      }
+
       this.publishing = true;
       this.view = 'publishing';
+      await this._saveParentPost();
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
         || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
       try {
@@ -958,7 +1070,13 @@ document.addEventListener('alpine:init', () => {
           headers: { 'X-CSRFToken': csrfToken },
         });
         const data = await resp.json();
-        if (data.queued && this.postId) {
+        if (!resp.ok) {
+          if (data.validation_errors && data.validation_errors.length) {
+            this.validationErrors = data.validation_errors;
+          }
+          this.publishing = false;
+          this.view = 'options';
+        } else if (data.queued && this.postId) {
           this.postStatus = 'publishing';
           this._subscribeSSE();
         } else {
@@ -987,8 +1105,10 @@ document.addEventListener('alpine:init', () => {
       const cleanup = () => {
         document.removeEventListener('publish-done', handler);
         if (timer) { clearTimeout(timer); timer = null; }
+        this._sseCleanup = null;
       };
 
+      this._sseCleanup = cleanup;
       document.addEventListener('publish-done', handler);
 
       timer = setTimeout(() => {
@@ -998,15 +1118,19 @@ document.addEventListener('alpine:init', () => {
       }, 6 * 60 * 1000);
     },
 
+    destroy() {
+      if (this._sseCleanup) this._sseCleanup();
+    },
+
     _onPublishDone(data) {
       this.publishing = false;
       this.postStatus = data.status;
-      // Build liveResults for display
-      const results = [];
-      (data.successes || []).forEach(p => results.push({ platform: p, success: true, error: null }));
-      Object.entries(data.failures || {}).forEach(([p, err]) => results.push({ platform: p, success: false, error: err }));
-      this.liveResults = results;
-      this.view = 'results';
+      // Reload the panel via Unpoly so the server-rendered version (with links) is shown.
+      if (this.panelUrl) {
+        up.navigate({ url: this.panelUrl, layer: this._ownLayer, history: false });
+      } else {
+        this.view = 'results';
+      }
     },
 
   }));
