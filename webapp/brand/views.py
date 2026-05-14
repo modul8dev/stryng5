@@ -50,9 +50,13 @@ def _create_logo_media_group(user, project, logo_url, brand_name):
             user=user,
             project=project,
             title=f'{brand_name} Logo' if brand_name else 'Brand Logo',
-            type=MediaGroup.GroupType.IMPORTED,
+            type=MediaGroup.GroupType.GENERAL,
         )
-        img = Media(media_group=group)
+        img = Media(
+            media_group=group,
+            source_type=Media.SourceType.IMPORTED,
+            media_type=Media.MediaType.IMAGE,
+            )
         svg_bytes = _decode_svg_data_uri(logo_url)
         if svg_bytes is not None:
             filename = f'logo_{uuid.uuid4().hex}.svg'
@@ -61,7 +65,7 @@ def _create_logo_media_group(user, project, logo_url, brand_name):
             img.external_url = logo_url
             img.save()
         return group
-    except Exception:
+    except Exception as e:
         return None
 
 
@@ -133,9 +137,9 @@ def _scrape_brand_data(user, project, url):
                 return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
 
             # Logo
-            media = _bg(branding, 'media')
-            if media:
-                logo_url = _bg(media, 'logo')
+            images = _bg(branding, 'images')
+            if images:
+                logo_url = _bg(images, 'logo')
 
             # Colors
             colors = _bg(branding, 'colors')

@@ -33,6 +33,7 @@ class MediaGroup(models.Model):
         PRODUCT = 'product', 'Product'
         MANUAL = 'manual', 'Manual'
         GENERATED = 'generated', 'Generated'
+        GENERAL = 'general', 'General'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
