@@ -12,6 +12,7 @@ from credits.constants import IMAGE_GENERATION_COST
 from credits.models import available_credits, spend_credits
 
 from brand.models import Brand
+from integrations.models import IntegrationConnection
 from media_library.models import Media, MediaGroup
 from services.ai_services import suggest_topic, generate_post_text, generate_post_media, edit_text
 from .forms import (
@@ -510,9 +511,15 @@ def post_publish_panel(request, pk):
     """Render the publish panel fragment (opened as Unpoly modal)."""
     post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
     platforms = post.platforms.filter(is_enabled=True).order_by('platform')
+    has_integrations = IntegrationConnection.objects.filter(
+        project=request.project,
+        provider_category=IntegrationConnection.ProviderCategory.SOCIAL_MEDIA,
+        status=IntegrationConnection.ConnectionStatus.ACTIVE,
+    ).exists()
     return render(request, 'social_media/post_publish_panel.html', {
         'post': post,
         'platforms': platforms,
+        'has_integrations': has_integrations,
     })
 
 
