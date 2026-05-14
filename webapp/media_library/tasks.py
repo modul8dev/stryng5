@@ -59,6 +59,44 @@ def on_product_import_post_execute(sender, task, **kwargs):
             send_event(channel, 'message', {'type': 'media_library:import_error', 'error': error or 'Unknown error'})
 
 
+def crawled_url_hook(task):
+    """
+    Hook called by Django-Q after each process_crawled_url_task result is saved.
+    Checks whether all tasks in the crawl group are done and batch_scrape.completed
+    has already fired (scrape_done cache key). If so, sets product_import_in_progress
+    to False and triggers deduplication exactly once via a cache lock.
+    """
+    args = task.args or []
+    if len(args) < 2:
+        return
+    project_id = args[1]
+    if not project_id:
+        return
+
+    group_id = f'crawl-{project_id}'
+    from django.core.cache import cache
+    from django_q.tasks import fetch_group, async_task
+
+    # Only proceed if batch_scrape.completed has already fired.
+    if not cache.get(f'{group_id}:scrape_done'):
+        return
+
+    expected = cache.get(f'{group_id}:expected', 0)
+    if not expected:
+        return
+
+    done = len(fetch_group(group_id))
+    if done < expected:
+        return
+
+    # All page tasks done — mark import finished and enqueue dedup exactly once.
+    from projects.models import Project
+    Project.objects.filter(pk=int(project_id)).update(product_import_in_progress=False)
+
+    if cache.add(f'{group_id}:dedup_triggered', True, timeout=3600):
+        async_task(deduplicate_project_media_task, int(project_id), group_id)
+
+
 def process_crawled_url_task(page_data, project_id, user_id, summary_method='ai'):
     """
     Process a single page from a Firecrawl batch-scrape webhook event.
@@ -120,15 +158,27 @@ def process_crawled_url_task(page_data, project_id, user_id, summary_method='ai'
 
     # Resolve relative URLs and deduplicate
     seen = set()
-    media_urls = []
+    raw_media_urls = []
     for src in raw_urls:
         if not src or src.startswith('data:'):
             continue
         absolute = urljoin(page_url, src) if page_url else src
         if absolute not in seen:
             seen.add(absolute)
-            media_urls.append(absolute)
+            raw_media_urls.append(absolute)
 
+    if not raw_media_urls:
+        return
+
+    # ── Apply per-page heuristics to filter obvious non-product images ────
+    from .image_heuristics import _select_distinct_product_media_urls
+    description_text = strip_tags(markdown).strip()[:500] if markdown else ''
+    media_urls = _select_distinct_product_media_urls(
+        raw_media_urls,
+        page_url=page_url,
+        page_title=title,
+        page_description=description_text,
+    )
     if not media_urls:
         return
 
@@ -163,3 +213,31 @@ def process_crawled_url_task(page_data, project_id, user_id, summary_method='ai'
             external_url=img_url,
             source_type=Media.SourceType.IMPORTED,
         )
+
+
+def deduplicate_project_media_task(project_id, group_id=None):
+    """
+    Run cross-group deduplication for all PRODUCT MediaGroups belonging to a project.
+    Removes images that appear across many groups (site-wide repeated assets such as
+    social icons, logos, and nav images) and deletes any MediaGroups left empty.
+    Cleans up the Django-Q group results and cache keys when done.
+    """
+    from projects.models import Project
+    from .image_heuristics import deduplicate_media_for_project
+
+    try:
+        project = Project.objects.get(pk=project_id)
+    except Project.DoesNotExist:
+        return
+
+    deduplicate_media_for_project(project)
+
+    if group_id:
+        from django_q.tasks import delete_group
+        from django.core.cache import cache
+        delete_group(group_id, tasks=True)
+        cache.delete_many([
+            f'{group_id}:expected',
+            f'{group_id}:scrape_done',
+            f'{group_id}:dedup_triggered',
+        ])

@@ -363,3 +363,66 @@ def _page_context_from_crawl_doc(doc, base_url):
         'description': description,
         'media_urls': media_urls,
     }
+
+
+def deduplicate_media_for_project(project, threshold_ratio=0.35):
+    """
+    Remove Media objects that appear across too many MediaGroups for a project —
+    these are site-wide repeated images (icons, logos, social badges, etc.).
+
+    Strategy:
+    - Normalize each external_url with _normalize_media_identity to collapse CDN
+      variants and size suffixes to a canonical identity.
+    - Count how many distinct MediaGroups each identity appears in.
+    - Delete any Media whose identity appears in >= threshold groups
+      (threshold = max(2, floor(n_groups * threshold_ratio))).
+    - Delete MediaGroups that are left completely empty after dedup.
+    """
+    from math import floor
+    from .models import Media, MediaGroup
+
+    groups = list(
+        MediaGroup.objects.filter(project=project, type=MediaGroup.GroupType.PRODUCT)
+        .prefetch_related('media_items')
+    )
+    n_groups = len(groups)
+    if n_groups < 2:
+        return
+
+    threshold = max(2, floor(n_groups * threshold_ratio))
+
+    # Build identity -> set of group PKs
+    identity_groups: dict[str, set] = {}
+    # Build identity -> list of Media PKs
+    identity_media_pks: dict[str, list] = {}
+
+    for group in groups:
+        for media in group.media_items.all():
+            url = (media.external_url or '').strip()
+            if not url:
+                continue
+            identity = _normalize_media_identity(url)
+            if not identity:
+                continue
+            identity_groups.setdefault(identity, set()).add(group.pk)
+            identity_media_pks.setdefault(identity, []).append(media.pk)
+
+    # Also filter obvious non-product assets regardless of threshold
+    repeated_pks = []
+    for identity, group_pks in identity_groups.items():
+        # Pick any url for this identity to run the obvious-non-product check
+        sample_pks = identity_media_pks[identity]
+        sample_media = Media.objects.filter(pk=sample_pks[0]).first()
+        sample_url = sample_media.external_url if sample_media else ''
+        if len(group_pks) >= threshold or _is_obvious_non_product_asset(sample_url):
+            repeated_pks.extend(identity_media_pks[identity])
+
+    if repeated_pks:
+        Media.objects.filter(pk__in=repeated_pks).delete()
+
+    # Remove MediaGroups that are now empty
+    MediaGroup.objects.filter(
+        project=project,
+        type=MediaGroup.GroupType.PRODUCT,
+        media_items__isnull=True,
+    ).delete()

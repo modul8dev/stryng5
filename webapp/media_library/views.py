@@ -523,21 +523,34 @@ def firecrawl_webhook(request):
         else:
             pages = []
 
-        from django_q.tasks import async_task
-        from .tasks import process_crawled_url_task
+        if pages and project_id:
+            group_id = f'crawl-{project_id}'
+            from django.core.cache import cache
+            cache.add(f'{group_id}:expected', 0, timeout=86400)
+            cache.incr(f'{group_id}:expected', len(pages))
 
+        from django_q.tasks import async_task
+        from .tasks import process_crawled_url_task, crawled_url_hook
+
+        group_id = f'crawl-{project_id}' if project_id else None
         for page_data in pages:
             async_task(
                 process_crawled_url_task,
                 page_data,
                 project_id,
                 user_id,
+                group=group_id,
+                hook=crawled_url_hook,
             )
 
     elif event_type == 'batch_scrape.completed':
         if project_id:
-            from projects.models import Project
-            Project.objects.filter(pk=int(project_id)).update(product_import_in_progress=False)
+            group_id = f'crawl-{project_id}'
+            from django.core.cache import cache
+            # Signal to the hook that all page events have been sent and
+            # the expected counter is final. The hook will set
+            # product_import_in_progress=False once all page tasks finish.
+            cache.set(f'{group_id}:scrape_done', True, timeout=86400)
 
         if user_id:
             from django_eventstream import send_event
