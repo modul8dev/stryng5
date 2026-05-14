@@ -8,6 +8,8 @@ from ..oauth import oauth
 from .base import BaseProvider
 
 LINKEDIN_API_BASE = 'https://api.linkedin.com'
+LINKEDIN_REST_BASE = 'https://api.linkedin.com/rest'
+LINKEDIN_API_VERSION = '202604'
 
 
 class LinkedInProvider(BaseProvider):
@@ -32,16 +34,22 @@ class LinkedInProvider(BaseProvider):
         '24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>'
     )
 
-    has_account_selection = False
+    has_account_selection = True
 
     def handle_callback(self, request):
         token = oauth.linkedin.authorize_access_token(request)
         return token
 
     def list_accounts(self, token_data):
-        """Fetch the authenticated LinkedIn member's profile via /v2/me."""
-        headers = {'Authorization': f"Bearer {token_data.get('access_token', '')}"}
+        """Fetch LinkedIn organizations the authenticated member administers."""
+        access_token = token_data.get('access_token', '')
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'LinkedIn-Version': LINKEDIN_API_VERSION,
+            'X-Restli-Protocol-Version': '2.0.0',
+        }
 
+        # Fetch member profile
         profile_resp = http_requests.get(
             f'{LINKEDIN_API_BASE}/v2/me',
             headers=headers,
@@ -50,40 +58,75 @@ class LinkedInProvider(BaseProvider):
         )
         profile_resp.raise_for_status()
         profile = profile_resp.json()
-
         member_id = profile.get('id', '')
         first = profile.get('localizedFirstName', '')
         last = profile.get('localizedLastName', '')
-        name = f'{first} {last}'.strip() or member_id
+        member_name = f'{first} {last}'.strip() or member_id
 
-        # Extract smallest profile picture URL if present
-        picture_url = ''
+        # Extract profile picture URL if present
+        member_picture = ''
         try:
             elements = profile['profilePicture']['displayImage~']['elements']
-            picture_url = elements[0]['identifiers'][0]['identifier']
+            member_picture = elements[0]['identifiers'][0]['identifier']
         except (KeyError, IndexError, TypeError):
             pass
 
-        # Fetch email separately
-        email = ''
-        try:
-            email_resp = http_requests.get(
-                f'{LINKEDIN_API_BASE}/v2/emailAddress',
-                headers=headers,
-                params={'q': 'members', 'projection': '(elements*(handle~))'},
-                timeout=15,
-            )
-            email_resp.raise_for_status()
-            email = email_resp.json()['elements'][0]['handle~']['emailAddress']
-        except Exception:
-            pass
-
-        return [{
+        # Start with the personal account
+        accounts = [{
             'id': member_id,
-            'name': name,
-            'picture_url': picture_url,
-            'email': email,
+            'name': member_name,
+            'picture_url': member_picture,
+            'category': 'Personal Account',
+            'member_id': member_id,
         }]
+
+        # Fetch organizations where the member is an administrator (REST API)
+        acl_resp = http_requests.get(
+            f'{LINKEDIN_REST_BASE}/organizationAcls',
+            headers=headers,
+            params={'q': 'roleAssignee', 'role': 'ADMINISTRATOR', 'state': 'APPROVED'},
+            timeout=15,
+        )
+        acl_resp.raise_for_status()
+        acl_elements = acl_resp.json().get('elements', [])
+
+        for entry in acl_elements:
+            org_urn = entry.get('organization', '')
+            # Extract numeric ID from URN like "urn:li:organization:12345"
+            org_id = org_urn.split(':')[-1] if org_urn else ''
+            if not org_id:
+                continue
+
+            # Fetch organization details via v2 API with logo projection expansion
+            try:
+                org_resp = http_requests.get(
+                    f'{LINKEDIN_API_BASE}/v2/organizations/{org_id}',
+                    headers=headers,
+                    params={'projection': '(id,localizedName,logoV2(original~:playableStreams))'},
+                    timeout=15,
+                )
+                org_resp.raise_for_status()
+                org = org_resp.json()
+            except Exception:
+                continue
+
+            # Extract logo URL if present
+            picture_url = ''
+            try:
+                elements = org['logoV2']['original~']['elements']
+                picture_url = elements[0]['identifiers'][0]['identifier']
+            except (KeyError, IndexError, TypeError):
+                pass
+
+            accounts.append({
+                'id': org_id,
+                'name': org.get('localizedName', org_id),
+                'picture_url': picture_url,
+                'category': 'Organization',
+                'member_id': member_id,
+            })
+
+        return accounts
 
     def save_connection(self, user, selected_account, token_data, project=None):
         expires_in = token_data.get('expires_in')
@@ -104,7 +147,7 @@ class LinkedInProvider(BaseProvider):
                 'status': IntegrationConnection.ConnectionStatus.ACTIVE,
                 'metadata': {
                     'picture_url': selected_account.get('picture_url', ''),
-                    'email': selected_account.get('email', ''),
+                    'member_id': selected_account.get('member_id', ''),
                 },
             },
         )
