@@ -507,6 +507,32 @@ def post_schedule(request, pk):
 
 
 @login_required
+@require_POST
+def post_save_scheduled_at(request, pk):
+    """Save scheduled_at datetime without changing post status."""
+    from django.utils import timezone
+    from datetime import datetime as dt_class
+
+    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
+    scheduled_at_str = request.POST.get('scheduled_at', '').strip()
+    if not scheduled_at_str:
+        post.scheduled_at = None
+        post.save(update_fields=['scheduled_at'])
+        return JsonResponse({'saved': True, 'scheduled_at': None})
+    try:
+        scheduled_at = dt_class.fromisoformat(scheduled_at_str)
+        if timezone.is_naive(scheduled_at):
+            import zoneinfo
+            project_tz = zoneinfo.ZoneInfo(post.project.timezone)
+            scheduled_at = timezone.make_aware(scheduled_at, project_tz)
+        post.scheduled_at = scheduled_at
+        post.save(update_fields=['scheduled_at'])
+        return JsonResponse({'saved': True, 'scheduled_at': post.scheduled_at.isoformat()})
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date/time format.'}, status=400)
+
+
+@login_required
 def post_publish_panel(request, pk):
     """Render the publish panel fragment (opened as Unpoly modal)."""
     post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)

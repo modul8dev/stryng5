@@ -14,6 +14,7 @@ urlpatterns = [
     path('<int:pk>/card/', views.post_card, name='post_card'),
     path('<int:pk>/schedule/', views.post_schedule, name='post_schedule'),
     path('<int:pk>/unschedule/', views.post_unschedule, name='post_unschedule'),
+    path('<int:pk>/save-scheduled-at/', views.post_save_scheduled_at, name='post_save_scheduled_at'),
     path('ai/suggest-topic/', views.ai_suggest_topic, name='ai_suggest_topic'),
     path('ai/edit-text/', views.ai_edit_text, name='ai_edit_text'),
 ]

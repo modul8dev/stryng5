@@ -885,8 +885,12 @@ document.addEventListener('alpine:init', () => {
     publishUrl: null,
     scheduleUrl: null,
     unscheduleUrl: null,
+    saveScheduledAtUrl: null,
     panelUrl: null,
     _sseCleanup: null,
+    _saveDebounceTimer: null,
+    _lastSavedScheduledAt: '',
+    _savingScheduledAt: false,
 
     // ── Lifecycle ────────────────────────────────────────────────────────
     init() {
@@ -899,11 +903,20 @@ document.addEventListener('alpine:init', () => {
         const d = new Date(rawScheduledAt);
         this.scheduledAt = isNaN(d.getTime()) ? rawScheduledAt : toLocalISOString(d);
       }
-      this.publishUrl    = this.$el.dataset.publishUrl;
-      this.scheduleUrl   = this.$el.dataset.scheduleUrl;
-      this.unscheduleUrl = this.$el.dataset.unscheduleUrl;
-      this.panelUrl      = this.$el.dataset.panelUrl;
-      this._ownLayer     = up.layer.current;
+      this.publishUrl          = this.$el.dataset.publishUrl;
+      this.scheduleUrl         = this.$el.dataset.scheduleUrl;
+      this.unscheduleUrl       = this.$el.dataset.unscheduleUrl;
+      this.saveScheduledAtUrl  = this.$el.dataset.saveScheduledAtUrl;
+      this.panelUrl            = this.$el.dataset.panelUrl;
+      this._lastSavedScheduledAt = this.scheduledAt;
+      this._ownLayer           = up.layer.current;
+
+      // Watch scheduledAt and debounce-save to database
+      this.$watch('scheduledAt', (val) => {
+        if (val === this._lastSavedScheduledAt) return;
+        clearTimeout(this._saveDebounceTimer);
+        this._saveDebounceTimer = setTimeout(() => this._autoSaveScheduledAt(val), 600);
+      });
 
       // Determine initial view from current post status
       if (this.postStatus === 'published' || this.postStatus === 'failed') {
@@ -1120,6 +1133,36 @@ document.addEventListener('alpine:init', () => {
 
     destroy() {
       if (this._sseCleanup) this._sseCleanup();
+      clearTimeout(this._saveDebounceTimer);
+    },
+
+    // ── Auto-save scheduledAt ─────────────────────────────────────────────
+    async _autoSaveScheduledAt(val) {
+      if (!this.saveScheduledAtUrl || this._savingScheduledAt) return;
+      this._savingScheduledAt = true;
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+      try {
+        const body = new URLSearchParams();
+        if (val) {
+          const dt = new Date(val);
+          if (!isNaN(dt.getTime())) {
+            body.set('scheduled_at', dt.toISOString());
+          }
+        }
+        const resp = await fetch(this.saveScheduledAtUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        });
+        if (resp.ok) {
+          this._lastSavedScheduledAt = val;
+        }
+      } catch (e) {
+        console.warn('publishPanel: could not auto-save scheduled_at', e);
+      } finally {
+        this._savingScheduledAt = false;
+      }
     },
 
     _onPublishDone(data) {

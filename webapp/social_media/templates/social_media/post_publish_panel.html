@@ -5,6 +5,7 @@
       data-publish-url="{% url 'social_media:post_publish' post.pk %}"
       data-schedule-url="{% url 'social_media:post_schedule' post.pk %}"
       data-unschedule-url="{% url 'social_media:post_unschedule' post.pk %}"
+      data-save-scheduled-at-url="{% url 'social_media:post_save_scheduled_at' post.pk %}"
       data-panel-url="{% url 'social_media:post_publish_panel' post.pk %}">
   {% csrf_token %}
   <div class="w-full">
