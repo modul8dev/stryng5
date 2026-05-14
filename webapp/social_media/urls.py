@@ -6,8 +6,9 @@ app_name = 'social_media'
 
 urlpatterns = [
     path('', views.post_list, name='post_list'),
-    path('create/', views.post_create, name='post_create'),
-    path('<int:pk>/edit/', views.post_edit, name='post_edit'),
+    path('save/', views.post_save, name='post_save'),
+    path('create/', views.post_form, name='post_form'),
+    path('<int:pk>/edit/', views.post_form, name='post_form'),
     path('<int:pk>/delete/', views.post_delete, name='post_delete'),
     path('<int:pk>/publish/', views.post_publish, name='post_publish'),
     path('<int:pk>/publish-panel/', views.post_publish_panel, name='post_publish_panel'),

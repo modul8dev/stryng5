@@ -2,104 +2,31 @@ import json
 import logging
 
 from django.contrib.auth.decorators import login_required
-from django.forms import inlineformset_factory
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from credits.constants import IMAGE_GENERATION_COST
-from credits.models import available_credits, spend_credits
+from credits.models import available_credits
 
 from brand.models import Brand
 from integrations.models import IntegrationConnection
-from media_library.models import Media, MediaGroup
-from services.ai_services import suggest_topic, generate_post_text, generate_post_media, edit_text
-from .forms import (
-    SharedMediaFormSet,
-    SocialMediaPostForm,
-    SocialMediaPostPlatformForm,
-)
+from media_library.models import Media
+from services.ai_services import suggest_topic, edit_text
+from .forms import SocialMediaPostForm
 from .models import (
     PLATFORM_CHOICES,
     SocialMediaPost,
+    SocialMediaPostMedia,
     SocialMediaPostPlatform,
     SocialMediaPostSeedImage,
     SocialMediaPlatformMedia,
 )
-from .publisher import publish_post
-from .tasks import publish_post_task, generate_post_task
-
-
-def _accept_layer_response():
-    return HttpResponse(status=204)
-
-
-def _build_media_groups_data(project):
-    groups = MediaGroup.objects.filter(project=project).prefetch_related('media_items')
-    return [
-        {
-            'id': g.id,
-            'title': g.title,
-            'media': [{'id': m.id, 'url': m.url, 'is_video': m.is_video} for m in g.media_items.all()],
-        }
-        for g in groups
-    ]
-
-
-def _save_platform_override_media(request, post):
-    raw = request.POST.get('platform_override_media_json', '{}')
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return
-    for platform_variant in post.platforms.all():
-        media_data = data.get(platform_variant.platform)
-        if media_data is None:
-            continue
-        platform_variant.override_media.all().delete()
-        for sort_order, item in enumerate(media_data):
-            media_id = item.get('media') if isinstance(item, dict) else item
-            if media_id:
-                try:
-                    media = Media.objects.get(pk=media_id)
-                except Media.DoesNotExist:
-                    continue
-                SocialMediaPlatformMedia.objects.create(
-                    platform_variant=platform_variant,
-                    media=media,
-                    sort_order=sort_order,
-                )
-
-
-def _save_seed_media(request, post):
-    raw = request.POST.get('seed_media_json', '[]')
-    try:
-        media_ids = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return
-    post.seed_media.all().delete()
-    for sort_order, media_id in enumerate(media_ids):
-        if media_id:
-            SocialMediaPostSeedImage.objects.create(
-                post=post,
-                media_id=media_id,
-                sort_order=sort_order,
-            )
 
 
 def _get_platform_label(key):
     return dict(PLATFORM_CHOICES).get(key, key)
-
-
-def _make_platform_formset(extra=0):
-    return inlineformset_factory(
-        SocialMediaPost,
-        SocialMediaPostPlatform,
-        form=SocialMediaPostPlatformForm,
-        extra=extra,
-        can_delete=False,
-    )
 
 
 @login_required
@@ -116,175 +43,83 @@ def post_list(request):
 
 
 @login_required
-def post_create(request):
-    enabled_platforms = request.project.get_enabled_platforms()
+def post_form(request, pk=None):
     user_media = Media.objects.filter(media_group__project=request.project).select_related('media_group')
 
-    if request.method == 'POST':
-        form = SocialMediaPostForm(request.POST)
-        PlatformFormSet = _make_platform_formset(extra=len(enabled_platforms))
-        platform_formset = PlatformFormSet(request.POST, prefix='platform', instance=SocialMediaPost())
-        media_formset = SharedMediaFormSet(request.POST, prefix='media', instance=SocialMediaPost())
-        if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
-            from django.utils import timezone
-            import datetime
-            post = form.save(commit=False)
-            post.user = request.user
-            post.project = request.project
-            if not post.title:
-                post.title = 'Untitled'
-            post.status = 'scheduled' if request.POST.get('action') == 'schedule' and post.scheduled_at else 'draft'
-            if not post.scheduled_at:
-                import zoneinfo
-                publish_time = request.project.default_publish_time
-                project_tz = zoneinfo.ZoneInfo(request.project.timezone)
-                latest = (
-                    SocialMediaPost.objects.filter(project=request.project)
-                    .exclude(scheduled_at=None)
-                    .order_by('-scheduled_at')
-                    .values_list('scheduled_at', flat=True)
-                    .first()
-                )
-                if latest:
-                    base_date = latest.astimezone(project_tz).date()
-                else:
-                    base_date = timezone.now().astimezone(project_tz).date()
-                next_date = base_date + datetime.timedelta(days=1)
-                post.scheduled_at = timezone.make_aware(
-                    datetime.datetime.combine(next_date, publish_time),
-                    project_tz,
-                )
-            post.save()
-            platform_formset.instance = post
-            platform_formset.save()
-            media_formset.instance = post
-            media_formset.save()
-            _save_platform_override_media(request, post)
-            _save_seed_media(request, post)
-            if request.POST.get('action') == 'generate':
-                err = _enqueue_generation(request, post)
-                if err:
-                    return err
-            return JsonResponse({'post_id': post.pk})
-    else:
-        form = SocialMediaPostForm()
-        initial_platforms = [{'platform': p} for p in enabled_platforms]
-        PlatformFormSet = _make_platform_formset(extra=len(enabled_platforms))
-        platform_formset = PlatformFormSet(
-            prefix='platform',
-            instance=SocialMediaPost(),
-            initial=initial_platforms,
-        )
-        media_formset = SharedMediaFormSet(prefix='media', instance=SocialMediaPost())
-
-    # Adjust media queryset on media forms
-    for mf in media_formset.forms:
-        mf.fields['media'].queryset = user_media
-
-    platform_labels = {p: _get_platform_label(p) for p in enabled_platforms}
-    brand = _get_project_brand(request.project)
-
-    # Support prefill from query params (used by inspiration cards)
-    prefill_topic = request.GET.get('topic', '')
-    prefill_mode = request.GET.get('mode', '')
-    auto_suggest = request.GET.get('auto_suggest', '') == '1'
-    prefill_seed_media_ids_raw = request.GET.get('seed_media_ids', '')
-    prefill_seed_media = []
-    if prefill_seed_media_ids_raw:
-        try:
-            id_list = [int(x) for x in prefill_seed_media_ids_raw.split(',') if x.strip()][:8]
-            prefill_seed_media = [
-                {'media': m.id, 'url': m.url, 'is_video': m.is_video}
-                for m in Media.objects.filter(id__in=id_list, media_group__project=request.project)
-            ][:8]
-        except (ValueError, TypeError):
-            pass
-
-    return render(request, 'social_media/post_form.html', {
-        'form': form,
-        'platform_formset': platform_formset,
-        'media_formset': media_formset,
-        'enabled_platforms': enabled_platforms,
-        'platform_labels': platform_labels,
-        'user_media': user_media,
-        'selected_shared_media': [],
-        'selected_platform_media': {},
-        'selected_seed_media': prefill_seed_media if prefill_seed_media else [],
-        'brand': brand,
-        'is_edit': False,
-        'prefill_topic': prefill_topic,
-        'prefill_mode': prefill_mode,
-        'auto_suggest': auto_suggest,
-    })
-
-
-@login_required
-def post_edit(request, pk):
-    post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
-    user_media = Media.objects.filter(media_group__project=request.project).select_related('media_group')
-
-    PlatformFormSet = _make_platform_formset(extra=0)
-    if request.method == 'POST':
-        form = SocialMediaPostForm(request.POST, instance=post)
-        platform_formset = PlatformFormSet(request.POST, instance=post, prefix='platform')
-        media_formset = SharedMediaFormSet(request.POST, instance=post, prefix='media')
-        if form.is_valid() and platform_formset.is_valid() and media_formset.is_valid():
-            updated_post = form.save(commit=False)
-            if not updated_post.title:
-                updated_post.title = 'Untitled'
-            if request.POST.get('action') == 'schedule' and updated_post.scheduled_at:
-                updated_post.status = 'scheduled'
-            updated_post.save()
-            platform_formset.save()
-            media_formset.save()
-            _save_platform_override_media(request, post)
-            _save_seed_media(request, post)
-            if request.POST.get('action') == 'generate':
-                err = _enqueue_generation(request, post)
-                if err:
-                    return err
-            return JsonResponse({'post_id': post.pk})
-    else:
+    if pk:
+        post = get_object_or_404(SocialMediaPost, pk=pk, project=request.project)
         form = SocialMediaPostForm(instance=post)
-        platform_formset = PlatformFormSet(instance=post, prefix='platform')
-        media_formset = SharedMediaFormSet(instance=post, prefix='media')
-
-    for mf in media_formset.forms:
-        mf.fields['media'].queryset = user_media
-
-    enabled_platforms = [p.platform for p in post.platforms.all()]
-    platform_labels = {p: _get_platform_label(p) for p in enabled_platforms}
-
-    selected_shared_media = [
-        {'media_id': m.id, 'media': m.media.id, 'url': m.media.url, 'is_video': m.media.is_video}
-        for m in post.shared_media.order_by('sort_order')
-    ]
-    platform_override_media = {}
-    for pv in post.platforms.prefetch_related('override_media__media').all():
-        platform_override_media[pv.platform] = [
-            {'media_id': m.id, 'media': m.media.id, 'url': m.media.url, 'is_video': m.media.is_video}
-            for m in pv.override_media.order_by('sort_order')
+        platform_variants = list(post.platforms.all())
+        enabled_platforms = [pv.platform for pv in platform_variants]
+        platforms_data = [
+            {
+                'platform': pv.platform,
+                'use_shared_text': pv.use_shared_text,
+                'override_text': pv.override_text or '',
+                'use_shared_media': pv.use_shared_media,
+            }
+            for pv in platform_variants
         ]
+        selected_shared_media = [
+            {'media_id': m.id, 'media': m.media.id, 'url': m.media.url, 'is_video': m.media.is_video}
+            for m in post.shared_media.order_by('sort_order')
+        ]
+        selected_platform_media = {}
+        for pv in post.platforms.prefetch_related('override_media__media').all():
+            selected_platform_media[pv.platform] = [
+                {'media_id': m.id, 'media': m.media.id, 'url': m.media.url, 'is_video': m.media.is_video}
+                for m in pv.override_media.order_by('sort_order')
+            ]
+        selected_seed_media = [
+            {'media': s.media.id, 'url': s.media.url, 'is_video': s.media.is_video}
+            for s in post.seed_media.select_related('media').order_by('sort_order')
+        ]
+        extra_ctx = {'post': post, 'is_edit': True}
+    else:
+        post = None
+        form = SocialMediaPostForm()
+        enabled_platforms = request.project.get_enabled_platforms()
+        platforms_data = [
+            {'platform': p, 'use_shared_text': True, 'override_text': '', 'use_shared_media': True}
+            for p in enabled_platforms
+        ]
+        selected_shared_media = []
+        selected_platform_media = {}
+        prefill_seed_media_ids_raw = request.GET.get('seed_media_ids', '')
+        selected_seed_media = []
+        if prefill_seed_media_ids_raw:
+            try:
+                id_list = [int(x) for x in prefill_seed_media_ids_raw.split(',') if x.strip()][:8]
+                selected_seed_media = [
+                    {'media': m.id, 'url': m.url, 'is_video': m.is_video}
+                    for m in Media.objects.filter(id__in=id_list, media_group__project=request.project)
+                ][:8]
+            except (ValueError, TypeError):
+                pass
+        extra_ctx = {
+            'is_edit': False,
+            'prefill_topic': request.GET.get('topic', ''),
+            'prefill_mode': request.GET.get('mode', ''),
+            'auto_suggest': request.GET.get('auto_suggest', '') == '1',
+        }
 
-    selected_seed_media = [
-        {'media': s.media.id, 'url': s.media.url, 'is_video': s.media.is_video}
-        for s in post.seed_media.select_related('media').order_by('sort_order')
-    ]
+    platform_labels = {p: _get_platform_label(p) for p in enabled_platforms}
 
     return render(request, 'social_media/post_form.html', {
         'form': form,
-        'platform_formset': platform_formset,
-        'media_formset': media_formset,
+        'platforms_data': platforms_data,
         'enabled_platforms': enabled_platforms,
         'platform_labels': platform_labels,
         'user_media': user_media,
         'selected_shared_media': selected_shared_media,
-        'selected_platform_media': platform_override_media,
+        'selected_platform_media': selected_platform_media,
         'selected_seed_media': selected_seed_media,
         'brand': _get_project_brand(request.project),
-        'post': post,
-        'is_edit': True,
+        **extra_ctx,
     })
+
+
+
 
 
 
@@ -376,6 +211,141 @@ def _enqueue_generation(request, post):
         platforms,
     )
     return None
+
+
+def _assign_default_scheduled_at(post, project):
+    """Assign a default scheduled_at if none provided (next day at project default publish time)."""
+    from django.utils import timezone
+    import datetime
+    import zoneinfo
+
+    publish_time = project.default_publish_time
+    project_tz = zoneinfo.ZoneInfo(project.timezone)
+    latest = (
+        SocialMediaPost.objects.filter(project=project)
+        .exclude(scheduled_at=None)
+        .order_by('-scheduled_at')
+        .values_list('scheduled_at', flat=True)
+        .first()
+    )
+    if latest:
+        base_date = latest.astimezone(project_tz).date()
+    else:
+        base_date = timezone.now().astimezone(project_tz).date()
+    next_date = base_date + datetime.timedelta(days=1)
+    post.scheduled_at = timezone.make_aware(
+        datetime.datetime.combine(next_date, publish_time),
+        project_tz,
+    )
+
+
+@login_required
+@require_POST
+def post_save(request):
+    """Unified create/update endpoint. Accepts JSON body, returns {post_id}."""
+    data = _parse_json_body(request)
+    if not data:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    post_id = data.get('post_id')
+    action = data.get('action', 'draft')
+
+    # Load or create the post
+    if post_id:
+        post = get_object_or_404(SocialMediaPost, pk=post_id, project=request.project)
+    else:
+        post = SocialMediaPost(user=request.user, project=request.project)
+
+    # Scalar fields
+    post.title = data.get('title', '') or 'Untitled'
+    post.shared_text = data.get('shared_text', '')
+    post.topic = data.get('topic', '')
+    post.post_type = data.get('post_type', '')
+    post.ai_instruction = data.get('ai_instruction', '')
+
+    # Status
+    if action == 'schedule' and post.scheduled_at:
+        post.status = 'scheduled'
+    elif not post_id:
+        post.status = 'draft'
+
+    # Default scheduled_at for new posts without one
+    if not post.scheduled_at and not post_id:
+        _assign_default_scheduled_at(post, request.project)
+
+    post.save()
+
+    # ── Platforms ──────────────────────────────────────────────────────────
+    platforms_data = data.get('platforms', [])
+    valid_platform_keys = dict(PLATFORM_CHOICES).keys()
+    existing_platforms = {p.platform: p for p in post.platforms.all()}
+
+    incoming_platform_keys = set()
+    for pdata in platforms_data:
+        platform_key = pdata.get('platform', '')
+        if platform_key not in valid_platform_keys:
+            continue
+        incoming_platform_keys.add(platform_key)
+
+        if platform_key in existing_platforms:
+            pv = existing_platforms[platform_key]
+        else:
+            pv = SocialMediaPostPlatform(post=post, platform=platform_key)
+
+        pv.use_shared_text = pdata.get('use_shared_text', True)
+        pv.override_text = pdata.get('override_text', '')
+        pv.use_shared_media = pdata.get('use_shared_media', True)
+        pv.is_enabled = True
+        pv.save()
+
+    # Remove platforms no longer in the list
+    post.platforms.exclude(platform__in=incoming_platform_keys).delete()
+
+    # ── Shared media (replace all) ────────────────────────────────────────
+    shared_media_ids = data.get('shared_media', [])
+    post.shared_media.all().delete()
+    for sort_order, media_id in enumerate(shared_media_ids):
+        try:
+            media = Media.objects.get(pk=media_id, media_group__project=request.project)
+        except Media.DoesNotExist:
+            continue
+        SocialMediaPostMedia.objects.create(post=post, media=media, sort_order=sort_order)
+
+    # ── Platform override media (replace all) ─────────────────────────────
+    platform_override_media = data.get('platform_override_media', {})
+    for pv in post.platforms.all():
+        pv.override_media.all().delete()
+        media_ids = platform_override_media.get(pv.platform, [])
+        for sort_order, media_id in enumerate(media_ids):
+            try:
+                media = Media.objects.get(pk=media_id, media_group__project=request.project)
+            except Media.DoesNotExist:
+                continue
+            SocialMediaPlatformMedia.objects.create(
+                platform_variant=pv, media=media, sort_order=sort_order,
+            )
+
+    # ── Seed media (replace all) ──────────────────────────────────────────
+    seed_media_ids = data.get('seed_media', [])
+    post.seed_media.all().delete()
+    for sort_order, media_id in enumerate(seed_media_ids):
+        try:
+            media = Media.objects.get(pk=media_id, media_group__project=request.project)
+        except Media.DoesNotExist:
+            continue
+        SocialMediaPostSeedImage.objects.create(post=post, media=media, sort_order=sort_order)
+
+    # ── Action handling ───────────────────────────────────────────────────
+    if action == 'generate':
+        err = _enqueue_generation(request, post)
+        if err:
+            return err
+
+    return JsonResponse({
+        'post_id': post.pk,
+        'status': post.status,
+        'scheduled_at': post.scheduled_at.isoformat() if post.scheduled_at else '',
+    })
 
 
 def _parse_json_body(request):

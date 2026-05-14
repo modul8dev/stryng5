@@ -1,7 +1,7 @@
 <div id="post-card-{{ post.pk }}"
      up-source="{% url 'social_media:post_card' post.pk %}"
      class="group/card relative flex flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md overflow-hidden">
-    <a href="{% url 'social_media:post_edit' post.pk %}"
+    <a href="{% url 'social_media:post_form' post.pk %}"
        up-layer="new"
        up-mode="modal"
        up-size="large"

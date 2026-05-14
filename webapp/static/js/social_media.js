@@ -21,7 +21,6 @@ document.addEventListener('alpine:init', () => {
     overrideTextShown: {},
     overrideMediaShown: {},
     overrideText: {},
-    textPrefilled: {},
 
     // ── AI state ──────────────────────────────────────────────────────────
     topic: '',
@@ -41,7 +40,6 @@ document.addEventListener('alpine:init', () => {
 
     // ── Image state ───────────────────────────────────────────────────────
     sharedMedia: [],        // [{mediaId, media, url}]
-    deletedShared: [],       // [{mediaId, media}] — existing records removed
     platformMedia: {},      // {platform: [{mediaId, media, url}]}
 
     // ── Dirty state ───────────────────────────────────────────────────────
@@ -85,13 +83,7 @@ document.addEventListener('alpine:init', () => {
       const ta = this.$el.querySelector('#id_shared_text');
       if (ta) this.sharedText = ta.value;
 
-      // Determine initial mode: existing posts → editor, new → ai
-      const isEdit = this.$el.querySelector('[name="seed_media_json"]') !== null
-        && document.getElementById('selected-seed-media-json') !== null;
-      const hasExistingText = !!(ta && ta.value.trim());
-
-      // Check if this is an edit form (post already exists)
-      const postFormAction = document.getElementById('post-form')?.getAttribute('action') || '';
+      // Set initial mode: existing posts → editor, new → ai
       const editIndicator = this.$el.closest('[x-data]')?.querySelector('h2');
       if (editIndicator && editIndicator.textContent.trim() === 'Edit Post') {
         this.mode = 'editor';
@@ -117,7 +109,6 @@ document.addEventListener('alpine:init', () => {
         this.overrideTextShown[platform] = textToggle ? !textToggle.checked : false;
         this.overrideMediaShown[platform] = mediaToggle ? !mediaToggle.checked : false;
         this.overrideText[platform] = overrideField ? overrideField.value : '';
-        this.textPrefilled[platform] = !!(overrideField && overrideField.value);
       });
 
       // Load selected shared media
@@ -200,11 +191,6 @@ document.addEventListener('alpine:init', () => {
         if (event.value.mediaIds) this.pickerAccepted(event.value);
       };
       document.addEventListener('up:layer:accepted', this._pickerHandler);
-
-      this.$nextTick(() => {
-        this.syncSharedMediaFormset();
-        this.syncPlatformMediaJson();
-      });
     },
 
     destroy() {
@@ -227,6 +213,17 @@ document.addEventListener('alpine:init', () => {
         }
       }
       up.layer.dismiss();
+    },
+
+    openPublishPanel() {
+      if (!this.publishPanelUrl) return;
+      up.layer.open({
+        url: this.publishPanelUrl,
+        mode: 'modal',
+        size: 'small',
+        cache: false,
+        history: false,
+      });
     },
 
     // ── Mode switching ────────────────────────────────────────────────────
@@ -361,7 +358,6 @@ document.addEventListener('alpine:init', () => {
           ...this.platformMedia,
           [platform]: this.sharedMedia.map(img => ({ mediaId: this._nextTempId(), media: img.media, url: img.url })),
         };
-        this.syncPlatformMediaJson();
       }
       this.overrideMediaShown[platform] = !checked;
     },
@@ -541,15 +537,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       if (target === 'shared') {
-        const newShared = this.sharedMedia.filter(img => {
-          if (!mediaIds.includes(img.media)) {
-            if (img.mediaId > 0) {
-              this.deletedShared = [...this.deletedShared, { mediaId: img.mediaId, media: img.media }];
-            }
-            return false;
-          }
-          return true;
-        });
+        const newShared = this.sharedMedia.filter(img => mediaIds.includes(img.media));
         const existingImageIds = this.sharedMedia.map(i => i.media);
         mediaIds.forEach(id => {
           if (!existingImageIds.includes(id)) {
@@ -557,7 +545,6 @@ document.addEventListener('alpine:init', () => {
           }
         });
         this.sharedMedia = newShared;
-        this.syncSharedMediaFormset();
         this._resetCarousel();
       } else {
         const platform = target.replace('platform:', '');
@@ -570,22 +557,14 @@ document.addEventListener('alpine:init', () => {
           }
         });
         this.platformMedia = { ...this.platformMedia, [platform]: newList };
-        this.syncPlatformMediaJson();
       }
     },
 
     // ── Shared media removal ──────────────────────────────────────────────
 
     removeSharedImage(mediaId) {
-      const idx = this.sharedMedia.findIndex(i => i.mediaId === mediaId);
-      if (idx === -1) return;
-      const removed = this.sharedMedia[idx];
-      this.sharedMedia = this.sharedMedia.filter((_, i) => i !== idx);
-      if (removed.mediaId > 0) {
-        this.deletedShared = [...this.deletedShared, { mediaId: removed.mediaId, media: removed.media }];
-      }
+      this.sharedMedia = this.sharedMedia.filter(i => i.mediaId !== mediaId);
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, this.sharedMedia.length - 1));
-      this.syncSharedMediaFormset();
       this.isDirty = true;
     },
 
@@ -599,70 +578,7 @@ document.addEventListener('alpine:init', () => {
         [platform]: newList,
       };
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, newList.length - 1));
-      this.syncPlatformMediaJson();
       this.isDirty = true;
-    },
-
-    // ── Formset sync ──────────────────────────────────────────────────────
-
-    syncSharedMediaFormset() {
-      const container = document.getElementById('shared-media-inputs');
-      if (!container) return;
-      container.innerHTML = '';
-
-      const prefix = 'media';
-      let formIdx = 0;
-
-      // Active existing media (have a real DB mediaId)
-      const existingActive = this.sharedMedia.filter(i => i.mediaId > 0);
-      existingActive.forEach(img => {
-        this._appendInput(container, `${prefix}-${formIdx}-id`, img.mediaId);
-        this._appendInput(container, `${prefix}-${formIdx}-media`, img.media);
-        this._appendInput(container, `${prefix}-${formIdx}-sort_order`, formIdx);
-        formIdx++;
-      });
-
-      // Deleted existing media (marked for deletion)
-      this.deletedShared.forEach(item => {
-        this._appendInput(container, `${prefix}-${formIdx}-id`, item.mediaId);
-        this._appendInput(container, `${prefix}-${formIdx}-media`, item.media);
-        this._appendInput(container, `${prefix}-${formIdx}-sort_order`, formIdx);
-        this._appendInput(container, `${prefix}-${formIdx}-DELETE`, 'on');
-        formIdx++;
-      });
-
-      const initialCount = existingActive.length + this.deletedShared.length;
-
-      // New media (temp negative mediaId, not yet saved)
-      const newMedia = this.sharedMedia.filter(i => !(i.mediaId > 0));
-      newMedia.forEach(img => {
-        this._appendInput(container, `${prefix}-${formIdx}-media`, img.media);
-        this._appendInput(container, `${prefix}-${formIdx}-sort_order`, formIdx);
-        formIdx++;
-      });
-
-      // Update management form
-      const totalInput = document.querySelector(`[name="${prefix}-TOTAL_FORMS"]`);
-      if (totalInput) totalInput.value = formIdx;
-      const initialInput = document.querySelector(`[name="${prefix}-INITIAL_FORM_COUNT"]`);
-      if (initialInput) initialInput.value = initialCount;
-    },
-
-    syncPlatformMediaJson() {
-      const result = {};
-      for (const [platform, media] of Object.entries(this.platformMedia)) {
-        result[platform] = media.map(img => ({ media: img.media }));
-      }
-      const input = document.getElementById('platform-override-media-json-input');
-      if (input) input.value = JSON.stringify(result);
-    },
-
-    _appendInput(container, name, value) {
-      const el = document.createElement('input');
-      el.type = 'hidden';
-      el.name = name;
-      el.value = value;
-      container.appendChild(el);
     },
 
     // ── Save state ────────────────────────────────────────────────────────
@@ -686,7 +602,7 @@ document.addEventListener('alpine:init', () => {
       };
 
       const errors = [];
-      this.$el.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
+      this.$root.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
         const platform = panel.id.replace('panel-', '');
         const label = PLATFORM_LABELS[platform] || platform;
 
@@ -751,25 +667,67 @@ document.addEventListener('alpine:init', () => {
     // ── Save post ─────────────────────────────────────────────────────────
 
     async savePost(closeOnSuccess = true, action = 'draft') {
-      const form = document.getElementById('post-form');
-      if (!form) return false;
-
       this.saving = true;
       try {
-        this.syncSharedMediaFormset();
-        this.syncPlatformMediaJson();
-
-        const formData = new FormData(form);
-        formData.set('action', action);
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-        const resp = await fetch(form.action, {
-          method: 'POST',
-          body: formData,
-          headers: { 'X-CSRFToken': csrfToken },
+
+        // Collect platform data from the DOM panels
+        const platforms = [];
+        this.$root.querySelectorAll('[id^="panel-"]:not(#panel-all)').forEach(panel => {
+          const platform = panel.id.replace('panel-', '');
+          platforms.push({
+            platform,
+            use_shared_text: !this.overrideTextShown[platform],
+            override_text: this.overrideText[platform] || '',
+            use_shared_media: !this.overrideMediaShown[platform],
+          });
         });
-        if (!resp.ok) return false;
+
+        // Build platform override media map
+        const platformOverrideMedia = {};
+        for (const [platform, media] of Object.entries(this.platformMedia)) {
+          platformOverrideMedia[platform] = media.map(img => img.media);
+        }
+
+        const payload = {
+          post_id: this.postId ? parseInt(this.postId) : null,
+          title: document.getElementById('id_title')?.value || '',
+          shared_text: this.sharedText,
+          topic: this.topic,
+          post_type: this.postType || document.getElementById('id_post_type')?.value || '',
+          ai_instruction: document.getElementById('id_ai_instruction')?.value || '',
+          action: action,
+          platforms: platforms,
+          shared_media: this.sharedMedia.map(img => img.media),
+          platform_override_media: platformOverrideMedia,
+          seed_media: this.seedMedia.map(img => img.media),
+        };
+
+        const resp = await fetch('/social-media/save/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          if (errData.error) console.error('Save failed:', errData.error);
+          return false;
+        }
+
         const data = await resp.json();
-        if (data.post_id) this.postId = data.post_id;
+        if (data.post_id) {
+          this.postId = data.post_id;
+          // Update dynamic URLs so publish panel works after first save
+          this.publishUrl = `/social-media/${data.post_id}/publish/`;
+          this.publishPanelUrl = `/social-media/${data.post_id}/publish-panel/`;
+          this.unscheduleUrl = `/social-media/${data.post_id}/unschedule/`;
+        }
+        if (data.status) this.postStatus = data.status;
+        if (data.scheduled_at !== undefined) this.scheduledAt = data.scheduled_at || '';
 
         if (closeOnSuccess) {
           up.layer.accept();
@@ -815,12 +773,10 @@ document.addEventListener('alpine:init', () => {
       arr.splice(targetIndex, 0, moved);
       if (type === 'shared') {
         this.sharedMedia = arr;
-        this.$nextTick(() => this.syncSharedMediaFormset());
       } else if (type === 'seed') {
         this.seedMedia = arr;
       } else if (type === 'platform') {
         this.platformMedia = { ...this.platformMedia, [platform]: arr };
-        this.$nextTick(() => this.syncPlatformMediaJson());
       }
       this.dragEnd();
       this._resetCarousel();

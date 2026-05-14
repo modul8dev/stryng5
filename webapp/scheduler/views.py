@@ -87,7 +87,7 @@ def scheduler_events(request):
                 'platforms': enabled_platforms,
                 'thumbnail': thumbnail,
                 'isVideo': is_video,
-                'editUrl': reverse('social_media:post_edit', args=[post.pk]),
+                'editUrl': reverse('social_media:post_form', args=[post.pk]),
             },
         })
 
@@ -128,7 +128,7 @@ def scheduler_event_detail(request, pk):
             'platforms': enabled_platforms,
             'thumbnail': thumbnail,
             'isVideo': is_video,
-            'editUrl': reverse('social_media:post_edit', args=[post.pk]),
+            'editUrl': reverse('social_media:post_form', args=[post.pk]),
         },
     })
 
