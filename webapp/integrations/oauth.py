@@ -8,5 +8,4 @@ oauth = OAuth()
 
 oauth.register(name='facebook')
 oauth.register(name='instagram')
-oauth.register(name='twitter')
 oauth.register(name='linkedin')

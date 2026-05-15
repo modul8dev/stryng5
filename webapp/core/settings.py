@@ -334,18 +334,6 @@ AUTHLIB_OAUTH_CLIENTS = {
             'token_endpoint_auth_method': 'client_secret_post',
         },
     },
-    'twitter': {
-        'client_id': os.environ.get('TWITTER_CLIENT_ID', ''),
-        'client_secret': os.environ.get('TWITTER_CLIENT_SECRET', ''),
-        'access_token_url': 'https://api.twitter.com/2/oauth2/token',
-        'authorize_url': 'https://twitter.com/i/oauth2/authorize',
-        'api_base_url': 'https://api.twitter.com/2/',
-        'client_kwargs': {
-            'scope': 'tweet.read tweet.write users.read offline.access',
-            'token_endpoint_auth_method': 'client_secret_basic',
-            'code_challenge_method': 'S256',
-        },
-    },
     'linkedin': {
         'client_id': os.environ.get('LINKEDIN_CLIENT_ID', ''),
         'client_secret': os.environ.get('LINKEDIN_CLIENT_SECRET', ''),
@@ -363,7 +351,6 @@ AUTHLIB_OAUTH_CLIENTS = {
 INTEGRATION_PROVIDERS = [
     'integrations.providers.facebook.FacebookProvider',
     'integrations.providers.instagram.InstagramProvider',
-    'integrations.providers.twitter.TwitterProvider',
     'integrations.providers.linkedin.LinkedInProvider',
 ]
 

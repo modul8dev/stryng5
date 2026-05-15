@@ -616,7 +616,6 @@ document.addEventListener('alpine:init', () => {
     validateForPublish() {
       const PLATFORM_LABELS = {
         linkedin: 'LinkedIn',
-        x: 'X (Twitter)',
         facebook: 'Facebook',
         instagram: 'Instagram',
       };

@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 LINKEDIN_API_BASE = 'https://api.linkedin.com'
 GRAPH_API_BASE = 'https://graph.facebook.com/v22.0'
 IG_GRAPH_BASE = 'https://graph.instagram.com/v25.0'
-TWITTER_API_BASE = 'https://api.twitter.com/2'
-TWITTER_UPLOAD_BASE = 'https://upload.twitter.com/1.1'
 
 
 # ─── Media helpers ────────────────────────────────────────────────────────────
@@ -217,108 +215,6 @@ def publish_to_linkedin(platform_variant, connection, base_url=''):
     post_urn = post_resp.headers.get('x-restli-id', '')
     if post_urn:
         return f'https://www.linkedin.com/feed/update/{post_urn}/'
-    return ''
-
-
-# ─── X (Twitter) ─────────────────────────────────────────────────────────────
-
-
-def publish_to_twitter(platform_variant, connection, base_url=''):
-    """Publish to X (Twitter) using the v2 Tweets API."""
-    token = connection.access_token
-    text = platform_variant.get_effective_text()
-    media = list(platform_variant.get_effective_media())
-
-    auth_headers = {'Authorization': f'Bearer {token}'}
-
-    media_ids = []
-    for media in media[:4]:  # X allows max 4 media items per tweet
-        media_data, content_type = _get_media_bytes_and_type(media.media)
-        is_video = media.media.is_video
-
-        if is_video:
-            # Chunked upload for video: INIT → APPEND → FINALIZE
-            total_bytes = len(media_data)
-            # INIT
-            init_resp = http_requests.post(
-                f'{TWITTER_UPLOAD_BASE}/media/upload.json',
-                headers=auth_headers,
-                data={
-                    'command': 'INIT',
-                    'media_type': content_type,
-                    'total_bytes': total_bytes,
-                    'media_category': 'tweet_video',
-                },
-                timeout=30,
-            )
-            init_resp.raise_for_status()
-            media_id = init_resp.json()['media_id_string']
-
-            # APPEND in 5 MB chunks
-            chunk_size = 5 * 1024 * 1024
-            segment = 0
-            for offset in range(0, total_bytes, chunk_size):
-                chunk = media_data[offset:offset + chunk_size]
-                append_resp = http_requests.post(
-                    f'{TWITTER_UPLOAD_BASE}/media/upload.json',
-                    headers=auth_headers,
-                    data={'command': 'APPEND', 'media_id': media_id, 'segment_index': segment},
-                    files={'media': chunk},
-                    timeout=60,
-                )
-                append_resp.raise_for_status()
-                segment += 1
-
-            # FINALIZE
-            finalize_resp = http_requests.post(
-                f'{TWITTER_UPLOAD_BASE}/media/upload.json',
-                headers=auth_headers,
-                data={'command': 'FINALIZE', 'media_id': media_id},
-                timeout=30,
-            )
-            finalize_resp.raise_for_status()
-            finalize_data = finalize_resp.json()
-
-            # Poll until processing is complete
-            processing_info = finalize_data.get('processing_info')
-            while processing_info and processing_info.get('state') in ('pending', 'in_progress'):
-                check_after = processing_info.get('check_after_secs', 5)
-                time.sleep(check_after)
-                status_resp = http_requests.get(
-                    f'{TWITTER_UPLOAD_BASE}/media/upload.json',
-                    headers=auth_headers,
-                    params={'command': 'STATUS', 'media_id': media_id},
-                    timeout=30,
-                )
-                status_resp.raise_for_status()
-                processing_info = status_resp.json().get('processing_info')
-
-            media_ids.append(media_id)
-        else:
-            upload_resp = http_requests.post(
-                f'{TWITTER_UPLOAD_BASE}/media/upload.json',
-                headers=auth_headers,
-                files={'media': ('media', media_data, content_type)},
-                timeout=60,
-            )
-            upload_resp.raise_for_status()
-            media_ids.append(upload_resp.json()['media_id_string'])
-
-    # Create tweet
-    tweet_payload = {'text': text}
-    if media_ids:
-        tweet_payload['media'] = {'media_ids': media_ids}
-
-    tweet_resp = http_requests.post(
-        f'{TWITTER_API_BASE}/tweets',
-        headers={**auth_headers, 'Content-Type': 'application/json'},
-        json=tweet_payload,
-        timeout=30,
-    )
-    tweet_resp.raise_for_status()
-    tweet_id = tweet_resp.json().get('data', {}).get('id')
-    if tweet_id:
-        return f'https://x.com/i/web/status/{tweet_id}'
     return ''
 
 
@@ -548,7 +444,6 @@ def publish_to_instagram(platform_variant, connection, base_url=''):
 _PLATFORM_PUBLISHERS = {
     'linkedin': publish_to_linkedin,
     'facebook': publish_to_facebook,
-    'x': publish_to_twitter,
     'instagram': publish_to_instagram,
 }
 
@@ -556,7 +451,6 @@ _PLATFORM_PUBLISHERS = {
 _PLATFORM_TO_PROVIDER = {
     'linkedin': 'linkedin',
     'facebook': 'facebook',
-    'x': 'twitter',
     'instagram': 'instagram',
 }
 

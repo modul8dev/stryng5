@@ -19,7 +19,6 @@ class Project(models.Model):
         default='en',
     )
     enable_linkedin = models.BooleanField(default=True)
-    enable_x = models.BooleanField(default=True)
     enable_facebook = models.BooleanField(default=True)
     enable_instagram = models.BooleanField(default=True)
     product_import_in_progress = models.BooleanField(default=False)
@@ -39,8 +38,6 @@ class Project(models.Model):
         platforms = []
         if self.enable_linkedin:
             platforms.append('linkedin')
-        if self.enable_x:
-            platforms.append('x')
         if self.enable_facebook:
             platforms.append('facebook')
         if self.enable_instagram:

@@ -5,21 +5,18 @@ from core import fields
 
 PLATFORM_CHOICES = [
     ('linkedin', 'LinkedIn'),
-    ('x', 'X (Twitter)'),
     ('facebook', 'Facebook'),
     ('instagram', 'Instagram'),
 ]
 
 PLATFORM_CHAR_LIMITS = {
     'linkedin': 3000,
-    'x': 280,
     'facebook': 63206,
     'instagram': 2200,
 }
 
 PLATFORM_IMAGE_LIMITS = {
     'linkedin': 9,
-    'x': 4,
     'facebook': 10,
     'instagram': 10,
 }
