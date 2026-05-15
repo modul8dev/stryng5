@@ -4,6 +4,7 @@
      data-source-media="{{ source_media_json }}"
      data-quick-access-media="{{ quick_access_media_json }}"
      data-group-id="{{ group_id }}"
+     data-use-result="{{ use_result|yesno:'true,false' }}"
      class="flex flex-col h-full w-full"
      up-main>
 
@@ -16,9 +17,11 @@
                     class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
                 Cancel
             </button>
-            <button type="button"
+            <button x-show="useResult"
+                    x-cloak
+                    type="button"
                     @click="save()"
-                    :disabled="!currentResult"
+                    :disabled="!focusMedia"
                     class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
@@ -31,62 +34,40 @@
     {# ── Body ── #}
     <div class="flex flex-1 overflow-hidden min-h-0">
 
-        {# ── Center: Input Media ── #}
+        {# ── Center: Focus Image + Input Strip ── #}
         <div class="flex flex-1 flex-col overflow-hidden">
 
-            {# Sub-header #}
-            <div class="flex shrink-0 items-center justify-between border-zinc-100 px-4 py-3">
-                <p class="text-sm font-medium text-zinc-700">Input Media</p>
-                <button type="button"
-                        @click="openPicker()"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-500 hover:border-indigo-400 hover:text-indigo-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Add
-                </button>
-            </div>
-
-            {# Image area — fills remaining height #}
-            <div class="flex-1 overflow-hidden p-4 min-h-0">
+            {# Focus image area — the main large image #}
+            <div class="flex-1 overflow-hidden p-4 min-h-0 flex items-center justify-center">
 
                 {# Skeleton while generating #}
                 <template x-if="generating">
-                    <div class="flex h-full gap-4">
-                        <template x-for="i in (attachedMedia.length || 3)" :key="i">
-                            <div class="flex-1 animate-pulse rounded-xl bg-zinc-200"></div>
-                        </template>
-                    </div>
+                    <div class="w-full h-full animate-pulse rounded-xl bg-zinc-200"></div>
                 </template>
 
-                {# Actual input media #}
-                <template x-if="!generating && attachedMedia.length > 0">
-                    <div class="h-full w-full grid gap-2 overflow-hidden min-h-0"
-                         :style="`grid-template-columns: repeat(${Math.ceil(Math.sqrt(attachedMedia.length))}, 1fr); grid-template-rows: repeat(${Math.ceil(attachedMedia.length / Math.ceil(Math.sqrt(attachedMedia.length)))}, 1fr)`">
-                        <template x-for="img in attachedMedia" :key="img.id">
-                            <div class="relative group flex items-center justify-center min-h-0 min-w-0 rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
-                                <img :src="img.url"
-                                     :alt="'Input media ' + img.badge"
-                                     class="max-h-full max-w-full object-contain rounded-lg" />
-                                <button type="button"
-                                        @click="removeAttachment(img.id)"
-                                        class="absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex hover:bg-red-600">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </template>
+                {# Focus image displayed large #}
+                <template x-if="!generating && focusMedia">
+                    <div class="relative flex items-center justify-center h-full w-full">
+                        <img :src="focusMedia.url"
+                             alt="Focus image"
+                             class="max-h-full max-w-full object-contain rounded-xl shadow-sm border border-zinc-200" />
+                        <span x-show="currentResult && focusMedia.id === currentResult.id"
+                              class="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                            </svg>
+                            Generated
+                        </span>
                     </div>
                 </template>
 
                 {# Empty state #}
-                <template x-if="!generating && attachedMedia.length === 0">
+                <template x-if="!generating && !focusMedia">
                     <div class="flex h-full flex-col items-center justify-center gap-4 text-zinc-400">
                         <svg xmlns="http://www.w3.org/2000/svg" class="size-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
-                        <p class="text-sm text-zinc-500">Add reference media for the AI to use</p>
+                        <p class="text-sm text-zinc-500">Select images from the right panel or add from library</p>
                         <button type="button"
                                 @click="openPicker()"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
@@ -100,20 +81,42 @@
 
             </div>
 
-            {# ── Generated History Strip ── #}
-            <div x-show="generatedHistory.length > 0"
-                 class="shrink-0 border-t border-zinc-200 bg-white px-4 py-3">
-                <p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Generated</p>
-                <div class="flex gap-2 overflow-x-auto pb-1">
-                    <template x-for="img in generatedHistory" :key="img.id">
-                        <button type="button"
-                                @click="addFromHistory(img)"
-                                title="Add to input"
-                                :class="attachedMedia.some(a => a.id === img.id) ? 'ring-2 ring-indigo-500 ring-offset-1' : 'hover:ring-2 hover:ring-indigo-400 hover:ring-offset-1'"
-                                class="relative shrink-0 overflow-hidden rounded-lg border border-zinc-200 transition-all">
-                            <img :src="img.url" class="size-20 object-contain bg-zinc-50" />
-                        </button>
+            {# ── Input media strip (thumbnails below focus) ── #}
+            <div class="shrink-0 border-t border-zinc-200 bg-zinc-50 px-4 py-3">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Edit Input</p>
+                        <span class="text-[10px] text-zinc-400" x-text="'(' + attachedMedia.length + '/8)'"></span>
+                    </div>
+                    <button type="button"
+                            @click="openPicker()"
+                            :disabled="attachedMedia.length >= 8"
+                            class="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-500 hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add
+                    </button>
+                </div>
+                <p class="text-[10px] text-zinc-400 mb-2">These images are sent to the AI as reference for generation.</p>
+                <div class="flex gap-2 overflow-x-auto pb-2 pt-1 px-1">
+                    <template x-for="img in attachedMedia" :key="img.id">
+                        <div class="relative shrink-0 group"
+                             @click="setFocus(img)">
+                            <div :class="focusMedia && focusMedia.id === img.id ? 'ring-2 ring-indigo-500 ring-offset-1' : 'hover:ring-2 hover:ring-indigo-400 hover:ring-offset-1'"
+                                 class="rounded-lg border border-zinc-200 overflow-hidden transition-all bg-white cursor-pointer">
+                                <img :src="img.url" class="size-14 object-cover" />
+                            </div>
+                            <button type="button"
+                                    @click.stop="removeAttachment(img.id)"
+                                    class="absolute -right-1 -top-1 hidden size-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex hover:bg-red-600 z-10">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
                     </template>
+                    <p x-show="attachedMedia.length === 0" class="text-xs text-zinc-400 self-center">Click images from the right panel to add</p>
                 </div>
             </div>
 
@@ -122,19 +125,48 @@
         {# ── Right: Controls ── #}
         <aside class="flex w-96 shrink-0 flex-col overflow-hidden border-l border-zinc-200 bg-white">
 
-            {# Quick Access — group media + previously used media #}
-            <div class="shrink-0 border-b border-zinc-100 px-4 py-4">
-                <p class="mb-2 text-xs font-semibold text-zinc-500">Quick Access</p>
-                <template x-if="mediaHistory.length === 0">
-                    <p class="text-xs text-zinc-400">Media you use or generate will appear here</p>
+            {# Product Images — imported (from group) #}
+            <div class="shrink-0 border-b border-zinc-100 px-4 py-4 overflow-y-auto max-h-48">
+                <p class="mb-1 text-xs font-semibold text-zinc-500">Product Images</p>
+                <p class="text-[10px] text-zinc-400 mb-2">Images from this media group. Click to add to edit input.</p>
+                <template x-if="mediaHistory.filter(h => !generatedHistory.some(g => g.id === h.id)).length === 0">
+                    <p class="text-xs text-zinc-400">No product images available</p>
                 </template>
-                <div class="flex flex-wrap gap-2" x-show="mediaHistory.length > 0">
-                    <template x-for="img in mediaHistory" :key="img.id">
+                <div class="flex flex-wrap gap-2" x-show="mediaHistory.filter(h => !generatedHistory.some(g => g.id === h.id)).length > 0">
+                    <template x-for="img in mediaHistory.filter(h => !generatedHistory.some(g => g.id === h.id))" :key="img.id">
                         <button type="button"
-                                @click="addFromHistory(img)"
-                                title="Click to add to input"
-                                class="relative overflow-hidden rounded-lg border border-zinc-200 transition-all hover:ring-2 hover:ring-indigo-400 hover:ring-offset-1">
-                            <img :src="img.url" class="size-16 object-cover" />
+                                @click="addFromHistory(img); setFocus(img)"
+                                :disabled="attachedMedia.length >= 8 && !attachedMedia.some(a => a.id === img.id)"
+                                :class="attachedMedia.some(a => a.id === img.id) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''"
+                                title="Click to add to edit input"
+                                class="relative overflow-hidden rounded-lg border border-zinc-200 transition-all hover:ring-2 hover:ring-indigo-400 hover:ring-offset-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <img :src="img.url" class="size-14 object-cover" />
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            {# AI Generated — generated images #}
+            <div class="shrink-0 border-b border-zinc-100 px-4 py-4 overflow-y-auto max-h-48">
+                <p class="mb-1 text-xs font-semibold text-violet-600">AI Generated</p>
+                <p class="text-[10px] text-zinc-400 mb-2">Previously generated images. Click to add to edit input.</p>
+                <template x-if="generatedHistory.length === 0">
+                    <p class="text-xs text-zinc-400">Generated images will appear here</p>
+                </template>
+                <div class="flex flex-wrap gap-2" x-show="generatedHistory.length > 0">
+                    <template x-for="img in generatedHistory" :key="'gen-' + img.id">
+                        <button type="button"
+                                @click="addFromHistory(img); setFocus(img)"
+                                :disabled="attachedMedia.length >= 8 && !attachedMedia.some(a => a.id === img.id)"
+                                :class="attachedMedia.some(a => a.id === img.id) ? 'ring-2 ring-violet-500 ring-offset-1' : ''"
+                                title="Click to add to edit input"
+                                class="relative overflow-hidden rounded-lg border border-violet-200 transition-all hover:ring-2 hover:ring-violet-400 hover:ring-offset-1 bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <img :src="img.url" class="size-14 object-cover" />
+                            <span class="absolute bottom-0.5 left-0.5 size-3 rounded-full bg-violet-500 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-2" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="3">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                </svg>
+                            </span>
                         </button>
                     </template>
                 </div>

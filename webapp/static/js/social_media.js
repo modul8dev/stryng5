@@ -25,7 +25,7 @@ document.addEventListener('alpine:init', () => {
     // ── AI state ──────────────────────────────────────────────────────────
     topic: '',
     postType: 'lifestyle',
-    seedMedia: [],           // [{mediaId, media, url}]
+    seedMedia: [],           // [{key, mediaPk, url}]  key=client uid, mediaPk=DB pk
     _tempIdCounter: 0,
     generating: false,
     generationStep: '',
@@ -39,8 +39,8 @@ document.addEventListener('alpine:init', () => {
     captionExpanded: false,
 
     // ── Image state ───────────────────────────────────────────────────────
-    sharedMedia: [],        // [{mediaId, media, url}]
-    platformMedia: {},      // {platform: [{mediaId, media, url}]}
+    sharedMedia: [],        // [{key, mediaPk, url}]  key=client uid, mediaPk=DB pk
+    platformMedia: {},      // {platform: [{key, mediaPk, url}]}
 
     // ── Dirty state ───────────────────────────────────────────────────────
     isDirty: false,
@@ -116,8 +116,8 @@ document.addEventListener('alpine:init', () => {
       if (sharedEl) {
         const data = JSON.parse(sharedEl.textContent);
         this.sharedMedia = data.map(item => ({
-          mediaId: item.media_id,
-          media: item.media,
+          key: item.media_id,
+          mediaPk: item.media,
           url: item.url,
           is_video: item.is_video || false,
         }));
@@ -130,8 +130,8 @@ document.addEventListener('alpine:init', () => {
         this.platformMedia = {};
         for (const [platform, media] of Object.entries(data)) {
           this.platformMedia[platform] = media.map(item => ({
-            mediaId: item.media_id,
-            media: item.media,
+            key: item.media_id,
+            mediaPk: item.media,
             url: item.url,
             is_video: item.is_video || false,
           }));
@@ -143,8 +143,8 @@ document.addEventListener('alpine:init', () => {
       if (seedEl) {
         const data = JSON.parse(seedEl.textContent);
         this.seedMedia = data.slice(0, 8).map(item => ({
-          mediaId: this._nextTempId(),
-          media: item.media,
+          key: this._nextTempId(),
+          mediaPk: item.media,
           url: item.url,
           is_video: item.is_video || false,
         }));
@@ -182,8 +182,8 @@ document.addEventListener('alpine:init', () => {
       // Listen for media picker acceptance
       this._pickerHandler = (event) => {
         if (!event.value) return;
-        // Image editor result: {media, media}
-        if (event.value.media && event.value.media && !event.value.mediaIds) {
+        // Image editor result: {mediaPk, url}
+        if (event.value.mediaPk && !event.value.mediaIds) {
           this.addEditorResultToSeeds(event.value);
           return;
         }
@@ -356,7 +356,7 @@ document.addEventListener('alpine:init', () => {
         // Seed platform media with shared media as starting point
         this.platformMedia = {
           ...this.platformMedia,
-          [platform]: this.sharedMedia.map(img => ({ mediaId: this._nextTempId(), media: img.media, url: img.url })),
+          [platform]: this.sharedMedia.map(img => ({ key: this._nextTempId(), mediaPk: img.mediaPk, url: img.url })),
         };
       }
       this.overrideMediaShown[platform] = !checked;
@@ -376,7 +376,7 @@ document.addEventListener('alpine:init', () => {
             'X-CSRFToken': csrfToken,
           },
           body: JSON.stringify({
-            seed_media_ids: this.seedMedia.map(i => i.media),
+            seed_media_ids: this.seedMedia.map(i => i.mediaPk),
           }),
         });
         const data = await resp.json();
@@ -485,15 +485,15 @@ document.addEventListener('alpine:init', () => {
 
     // ── Seed Image Management ─────────────────────────────────────────────
 
-    removeSeedImage(mediaId) {
-      this.seedMedia = this.seedMedia.filter(i => i.mediaId !== mediaId);
+    removeSeedImage(key) {
+      this.seedMedia = this.seedMedia.filter(i => i.key !== key);
       this.isDirty = true;
     },
 
-    addEditorResultToSeeds({ media }) {
-      if (!media || this.seedMedia.some(i => i.media === media)) return;
+    addEditorResultToSeeds({ mediaPk, url }) {
+      if (!mediaPk || this.seedMedia.some(i => i.mediaPk === mediaPk)) return;
       if (this.seedMedia.length >= 8) return;
-      this.seedMedia = [...this.seedMedia, { mediaId: this._nextTempId(), media, url: media }];
+      this.seedMedia = [...this.seedMedia, { key: this._nextTempId(), mediaPk, url }];
       this.isDirty = true;
     },
 
@@ -508,7 +508,7 @@ document.addEventListener('alpine:init', () => {
       } else {
         currentMedia = this.platformMedia[target.replace('platform:', '')] || [];
       }
-      const selectedIds = currentMedia.map(i => i.media).join(',');
+      const selectedIds = currentMedia.map(i => i.mediaPk).join(',');
       const allowVideo = target !== 'seed';
       up.layer.open({
         url: `/media-library/media-picker/?target=${encodeURIComponent(target)}&selected=${selectedIds}&allow_video=${allowVideo ? '1' : '0'}`,
@@ -524,8 +524,8 @@ document.addEventListener('alpine:init', () => {
       if (target === 'seed') {
         // Seed media: replace fully, limit to 8
         this.seedMedia = mediaIds.slice(0, 8).map(id => ({
-          mediaId: this._nextTempId(),
-          media: id,
+          key: this._nextTempId(),
+          mediaPk: id,
           url: urls[id],
           is_video: (isVideoMap && isVideoMap[id]) || false,
         }));
@@ -537,11 +537,11 @@ document.addEventListener('alpine:init', () => {
       }
 
       if (target === 'shared') {
-        const newShared = this.sharedMedia.filter(img => mediaIds.includes(img.media));
-        const existingImageIds = this.sharedMedia.map(i => i.media);
+        const newShared = this.sharedMedia.filter(img => mediaIds.includes(img.mediaPk));
+        const existingPks = this.sharedMedia.map(i => i.mediaPk);
         mediaIds.forEach(id => {
-          if (!existingImageIds.includes(id)) {
-            newShared.push({ mediaId: this._nextTempId(), media: id, url: urls[id], is_video: (isVideoMap && isVideoMap[id]) || false });
+          if (!existingPks.includes(id)) {
+            newShared.push({ key: this._nextTempId(), mediaPk: id, url: urls[id], is_video: (isVideoMap && isVideoMap[id]) || false });
           }
         });
         this.sharedMedia = newShared;
@@ -549,11 +549,11 @@ document.addEventListener('alpine:init', () => {
       } else {
         const platform = target.replace('platform:', '');
         const existing = this.platformMedia[platform] || [];
-        const existingImageIds = existing.map(i => i.media);
-        const newList = existing.filter(img => mediaIds.includes(img.media));
+        const existingPks = existing.map(i => i.mediaPk);
+        const newList = existing.filter(img => mediaIds.includes(img.mediaPk));
         mediaIds.forEach(id => {
-          if (!existingImageIds.includes(id)) {
-            newList.push({ mediaId: this._nextTempId(), media: id, url: urls[id], is_video: (isVideoMap && isVideoMap[id]) || false });
+          if (!existingPks.includes(id)) {
+            newList.push({ key: this._nextTempId(), mediaPk: id, url: urls[id], is_video: (isVideoMap && isVideoMap[id]) || false });
           }
         });
         this.platformMedia = { ...this.platformMedia, [platform]: newList };
@@ -562,22 +562,42 @@ document.addEventListener('alpine:init', () => {
 
     // ── Shared media removal ──────────────────────────────────────────────
 
-    removeSharedImage(mediaId) {
-      this.sharedMedia = this.sharedMedia.filter(i => i.mediaId !== mediaId);
+    removeSharedImage(key) {
+      this.sharedMedia = this.sharedMedia.filter(i => i.key !== key);
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, this.sharedMedia.length - 1));
+      this.isDirty = true;
+    },
+
+    replaceSharedImage(idx, result) {
+      if (!result || !result.value || !result.value.mediaPk) return;
+      const img = this.sharedMedia[idx];
+      if (!img) return;
+      this.sharedMedia[idx] = { ...img, mediaPk: result.value.mediaPk, url: result.value.url };
+      this.sharedMedia = [...this.sharedMedia];
       this.isDirty = true;
     },
 
     // ── Platform media removal ────────────────────────────────────────────
 
-    removePlatformImage(platform, mediaId) {
+    removePlatformImage(platform, key) {
       const list = this.platformMedia[platform] || [];
-      const newList = list.filter(i => i.mediaId !== mediaId);
+      const newList = list.filter(i => i.key !== key);
       this.platformMedia = {
         ...this.platformMedia,
         [platform]: newList,
       };
       this.carouselIndex = Math.min(this.carouselIndex, Math.max(0, newList.length - 1));
+      this.isDirty = true;
+    },
+
+    replacePlatformImage(platform, idx, result) {
+      if (!result || !result.mediaPk) return;
+      const list = this.platformMedia[platform] || [];
+      const img = list[idx];
+      if (!img) return;
+      const newList = [...list];
+      newList[idx] = { ...img, mediaPk: result.mediaPk, url: result.url };
+      this.platformMedia = { ...this.platformMedia, [platform]: newList };
       this.isDirty = true;
     },
 
@@ -686,7 +706,7 @@ document.addEventListener('alpine:init', () => {
         // Build platform override media map
         const platformOverrideMedia = {};
         for (const [platform, media] of Object.entries(this.platformMedia)) {
-          platformOverrideMedia[platform] = media.map(img => img.media);
+          platformOverrideMedia[platform] = media.map(img => img.mediaPk);
         }
 
         const payload = {
@@ -698,9 +718,9 @@ document.addEventListener('alpine:init', () => {
           ai_instruction: document.getElementById('id_ai_instruction')?.value || '',
           action: action,
           platforms: platforms,
-          shared_media: this.sharedMedia.map(img => img.media),
+          shared_media: this.sharedMedia.map(img => img.mediaPk),
           platform_override_media: platformOverrideMedia,
-          seed_media: this.seedMedia.map(img => img.media),
+          seed_media: this.seedMedia.map(img => img.mediaPk),
         };
 
         const resp = await fetch('/social-media/save/', {

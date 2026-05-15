@@ -130,7 +130,7 @@
                         <p class="block text-sm font-medium text-zinc-700 mb-3">Seed Media</p>
                         <p class="text-xs text-zinc-400 mb-2">Select media to provide context for AI generation. These are NOT posted — they inspire the content.</p>
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <template x-for="(img, idx) in seedMedia" :key="img.mediaId">
+                            <template x-for="(img, idx) in seedMedia" :key="img.key">
                                 <div class="relative group cursor-grab active:cursor-grabbing"
                                      draggable="true"
                                      @dragstart="dragStart($event, idx, 'seed')"
@@ -140,7 +140,7 @@
                                      :class="isDragOver(idx, 'seed') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                     <preview-media :src="img.url" :data-is-video="img.is_video ? 'true' : 'false'" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-media>
                                     <button type="button"
-                                            @click="removeSeedImage(img.mediaId)"
+                                            @click="removeSeedImage(img.key)"
                                             class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -332,7 +332,7 @@
 
                             {# Thumbnail grid #}
                             <div class="flex flex-wrap gap-2 mb-3" id="shared-media-thumbnails">
-                                <template x-for="(img, idx) in sharedMedia" :key="img.mediaId">
+                                <template x-for="(img, idx) in sharedMedia" :key="img.key">
                                     <div class="relative group cursor-grab active:cursor-grabbing"
                                          draggable="true"
                                          @dragstart="dragStart($event, idx, 'shared')"
@@ -341,8 +341,23 @@
                                          @dragend="dragEnd()"
                                          :class="isDragOver(idx, 'shared') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                         <preview-media :src="img.url" :data-is-video="img.is_video ? 'true' : 'false'" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-media>
+                                        <a x-show="!img.is_video"
+                                           :href="'{% url 'media_library:media_editor_modal' %}?media=' + img.mediaPk + '&use_result=1'"
+                                           up-layer="new"
+                                           up-mode="modal"
+                                           up-history="false"
+                                           up-size="large"
+                                           up-class="media-editor"
+                                           up-on-accepted="this.dispatchEvent(new CustomEvent('editor-accepted', {detail: value}))"
+                                           @editor-accepted="replaceSharedImage(idx, $event.detail)"
+                                           class="absolute -top-1.5 -left-1.5 hidden group-hover:flex items-center justify-center bg-violet-500 rounded-full w-5 h-5 text-white hover:bg-violet-600 z-10"
+                                           title="AI Edit">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                            </svg>
+                                        </a>
                                         <button type="button"
-                                                @click="removeSharedImage(img.mediaId)"
+                                                @click="removeSharedImage(img.key)"
                                                 class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -423,7 +438,7 @@
 
                             {# Thumbnail grid — shared media when "use shared" is checked #}
                             <div class="flex flex-wrap gap-2 mb-3" x-show="!overrideMediaShown['{{ platform }}']">
-                                <template x-for="img in sharedMedia" :key="img.mediaId">
+                                <template x-for="img in sharedMedia" :key="img.key">
                                     <div class="relative">
                                         <preview-media :src="img.url" :data-is-video="img.is_video ? 'true' : 'false'" class="h-48 w-48 object-cover rounded-lg border border-zinc-200 opacity-60"></preview-media>
                                     </div>
@@ -433,7 +448,7 @@
 
                             {# Thumbnail grid — platform override media when "use shared" is unchecked #}
                             <div class="flex flex-wrap gap-2 mb-3" x-show="overrideMediaShown['{{ platform }}']">
-                                <template x-for="(img, idx) in (platformMedia['{{ platform }}'] || [])" :key="img.mediaId">
+                                <template x-for="(img, idx) in (platformMedia['{{ platform }}'] || [])" :key="img.key">
                                     <div class="relative group cursor-grab active:cursor-grabbing"
                                          draggable="true"
                                          @dragstart="dragStart($event, idx, 'platform', '{{ platform }}')"
@@ -442,8 +457,23 @@
                                          @dragend="dragEnd()"
                                          :class="isDragOver(idx, 'platform', '{{ platform }}') ? 'opacity-50 ring-2 ring-indigo-400 rounded-lg' : ''">
                                         <preview-media :src="img.url" :data-is-video="img.is_video ? 'true' : 'false'" class="h-48 w-48 object-cover rounded-lg border border-zinc-200"></preview-media>
+                                        <a x-show="!img.is_video"
+                                           :href="'{% url 'media_library:media_editor_modal' %}?media=' + img.mediaPk + '&use_result=1'"
+                                           up-layer="new"
+                                           up-mode="modal"
+                                           up-history="false"
+                                           up-size="large"
+                                           up-class="media-editor"
+                                           up-on-accepted="this.dispatchEvent(new CustomEvent('platform-editor-accepted', {detail: value}))"
+                                           @platform-editor-accepted="replacePlatformImage('{{ platform }}', idx, $event.detail)"
+                                           class="absolute -top-1.5 -left-1.5 hidden group-hover:flex items-center justify-center bg-violet-500 rounded-full w-5 h-5 text-white hover:bg-violet-600 z-10"
+                                           title="AI Edit">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                            </svg>
+                                        </a>
                                         <button type="button"
-                                                @click="removePlatformImage('{{ platform }}', img.mediaId)"
+                                                @click="removePlatformImage('{{ platform }}', img.key)"
                                                 class="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center bg-red-500 rounded-full w-5 h-5 text-white hover:bg-red-600">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -513,7 +543,7 @@
                          @mouseenter="carouselHover = true" @mouseleave="carouselHover = false">
 
                         {# Slides #}
-                        <template x-for="(img, idx) in previewMedia()" :key="img.mediaId">
+                        <template x-for="(img, idx) in previewMedia()" :key="img.key">
                             <div x-show="carouselIndex === idx" class="absolute inset-0">
                                 <preview-media :src="img.url" :data-is-video="img.is_video ? 'true' : 'false'" class="w-full h-full object-cover"></preview-media>
                             </div>

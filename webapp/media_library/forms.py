@@ -20,7 +20,7 @@ class MediaGroupForm(forms.ModelForm):
             'description': forms.Textarea(attrs={
                 'class': 'textarea textarea-bordered w-full',
                 'placeholder': 'Description (optional)',
-                'rows': 3,
+                'style': 'field-sizing: content; max-height: calc(10lh + 1rem); overflow-y: auto;',
             }),
         }
 

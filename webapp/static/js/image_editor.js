@@ -10,10 +10,12 @@ document.addEventListener('alpine:init', () => {
     prompt: '',
     generating: false,
     currentResult: null,   // {id, url, prompt} — most recent generation
+    focusMedia: null,      // {id, url} — the main image displayed large in focus
     mediaHistory: [],      // [{id, url}] — all media used in sessions (inputs + generated), newest first
     generatedHistory: [],  // [{id, url}] — only AI-generated results, newest first
     promptHistory: [],     // [string] — all used prompts, newest first, dedup'd
     groupId: null,
+    useResult: false,
     error: null,
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -25,11 +27,15 @@ document.addEventListener('alpine:init', () => {
         generateUrl: root.dataset.generateUrl || '',
       };
 
+      // Read use_result mode
+      this.useResult = root.dataset.useResult === 'true';
+
       // Pre-load source media into input area (single media edit mode)
       try {
-        const src = JSON.parse(root.dataset.sourceImage || 'null');
+        const src = JSON.parse(root.dataset.sourceMedia || 'null');
         if (src && src.id && src.url) {
           this.attachedMedia = [{ id: src.id, badge: this.nextBadge++, url: src.url }];
+          this.focusMedia = { id: src.id, url: src.url };
         }
       } catch (_) { /* ignore */ }
 
@@ -37,7 +43,12 @@ document.addEventListener('alpine:init', () => {
       try {
         const quickAccess = JSON.parse(root.dataset.quickAccessMedia || '[]');
         if (Array.isArray(quickAccess) && quickAccess.length > 0) {
-          this.mediaHistory = quickAccess.map(img => ({ id: img.id, url: img.url }));
+          this.mediaHistory = quickAccess
+            .filter(img => !img.is_generated)
+            .map(img => ({ id: img.id, url: img.url }));
+          this.generatedHistory = quickAccess
+            .filter(img => img.is_generated)
+            .map(img => ({ id: img.id, url: img.url }));
         }
       } catch (_) { /* ignore */ }
 
@@ -58,6 +69,12 @@ document.addEventListener('alpine:init', () => {
       document.removeEventListener('up:layer:accepted', this._pickerHandler);
     },
 
+    // ── Focus ──────────────────────────────────────────────────────────────
+
+    setFocus(img) {
+      this.focusMedia = { id: img.id, url: img.url };
+    },
+
     // ── Picker ─────────────────────────────────────────────────────────────
 
     openPicker() {
@@ -74,17 +91,29 @@ document.addEventListener('alpine:init', () => {
     pickerAccepted({ mediaIds, urls }) {
       const existingIds = new Set(this.attachedMedia.map(i => i.id));
       mediaIds.forEach(id => {
-        if (!existingIds.has(id)) {
-          this.attachedMedia = [
-            ...this.attachedMedia,
-            { id, badge: this.nextBadge++, url: urls[id] },
-          ];
+        if (existingIds.has(id)) return;
+        if (this.attachedMedia.length >= 8) return;
+        const newItem = { id, badge: this.nextBadge++, url: urls[id] };
+        this.attachedMedia = [...this.attachedMedia, newItem];
+        // Set as focus if no focus yet
+        if (!this.focusMedia) {
+          this.focusMedia = { id, url: urls[id] };
         }
       });
     },
 
     removeAttachment(id) {
       this.attachedMedia = this.attachedMedia.filter(i => i.id !== id);
+      // Update focus if removed item was focused
+      if (this.focusMedia && this.focusMedia.id === id) {
+        if (this.attachedMedia.length > 0) {
+          this.focusMedia = { id: this.attachedMedia[0].id, url: this.attachedMedia[0].url };
+        } else if (this.currentResult) {
+          this.focusMedia = { id: this.currentResult.id, url: this.currentResult.url };
+        } else {
+          this.focusMedia = null;
+        }
+      }
     },
 
     // ── History actions ────────────────────────────────────────────────────
@@ -97,12 +126,12 @@ document.addEventListener('alpine:init', () => {
     // Add a previously generated media back into the input area (dedup)
     addFromHistory(img) {
       const existingIds = new Set(this.attachedMedia.map(i => i.id));
-      if (!existingIds.has(img.id)) {
-        this.attachedMedia = [
-          ...this.attachedMedia,
-          { id: img.id, badge: this.nextBadge++, url: img.url },
-        ];
-      }
+      if (existingIds.has(img.id)) return;
+      if (this.attachedMedia.length >= 8) return;
+      this.attachedMedia = [
+        ...this.attachedMedia,
+        { id: img.id, badge: this.nextBadge++, url: img.url },
+      ];
     },
 
     // ── Generate ───────────────────────────────────────────────────────────
@@ -151,6 +180,9 @@ document.addEventListener('alpine:init', () => {
         this.attachedMedia = [{ id: img.id, badge: 1, url: img.url }];
         this.nextBadge = 2;
 
+        // Set focus to the generated result
+        this.focusMedia = { id: img.id, url: img.url };
+
         // Add generated media to quick access (dedup)
         if (!this.mediaHistory.some(h => h.id === img.id)) {
           this.mediaHistory = [img, ...this.mediaHistory];
@@ -179,11 +211,11 @@ document.addEventListener('alpine:init', () => {
     // ── Save / Use result ─────────────────────────────────────────────────
 
     save() {
-      if (!this.currentResult) return;
+      if (!this.focusMedia) return;
       up.layer.accept({
         value: {
-          media: this.currentResult.id,
-          media: this.currentResult.url,
+          mediaPk: this.focusMedia.id,
+          url: this.focusMedia.url,
         },
       });
     },

@@ -719,6 +719,7 @@ def media_editor_modal(request):
     quick_access_media = []
     media = request.GET.get('media')
     group_id = request.GET.get('group_id')
+    use_result = request.GET.get('use_result') == '1'
     if media:
         try:
             img = Media.objects.select_related('media_group').get(
@@ -726,18 +727,30 @@ def media_editor_modal(request):
                 media_group__project=request.project,
             )
             source_media = {'id': img.id, 'url': img.url}
+            # Derive group from the media item
+            if not group_id:
+                group_id = str(img.media_group_id)
+            # Populate quick access from sibling media in the same group
+            quick_access_media = [
+                {'id': m.id, 'url': m.url, 'is_generated': m.source_type == Media.SourceType.GENERATED}
+                for m in img.media_group.media_items.exclude(pk=img.pk)
+            ]
         except (Media.DoesNotExist, ValueError):
             pass
     elif group_id:
         try:
             group = MediaGroup.objects.get(pk=int(group_id), project=request.project)
-            quick_access_media = [{'id': m.id, 'url': m.url} for m in group.media_items.all()]
+            quick_access_media = [
+                {'id': m.id, 'url': m.url, 'is_generated': m.source_type == Media.SourceType.GENERATED}
+                for m in group.media_items.all()
+            ]
         except (MediaGroup.DoesNotExist, ValueError):
             pass
     return render(request, 'media_library/image_editor_modal.html', {
         'source_media_json': json.dumps(source_media) if source_media else 'null',
         'quick_access_media_json': json.dumps(quick_access_media),
         'group_id': group_id or '',
+        'use_result': use_result,
         'picker_url': reverse('media_library:media_picker'),
         'generate_url': reverse('media_library:media_editor_generate'),
     })
