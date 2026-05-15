@@ -1,0 +1,123 @@
+{% load mjml %}
+
+{% mjml %}
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" />
+      <mj-text font-size="16px" line-height="1.6" color="#374151" />
+      <mj-button font-size="16px" font-weight="600" inner-padding="14px 32px" border-radius="8px" />
+    </mj-attributes>
+    <mj-style>
+      a { color: #4F46E5; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f3f4f6">
+    <!-- Spacer -->
+    <mj-section padding="20px 0 0 0"></mj-section>
+
+    <!-- Header -->
+    <mj-section background-color="#4F46E5" border-radius="12px 12px 0 0" padding="28px 40px">
+      <mj-column>
+        <mj-text font-size="24px" font-weight="700" color="#ffffff" align="center" letter-spacing="-0.5px">
+          Stryng
+        </mj-text>
+        <mj-text font-size="14px" color="#c7d2fe" align="center" padding-top="2px">
+          Social content, made effortless
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Intro -->
+    <mj-section background-color="#ffffff" padding="36px 40px 16px 40px">
+      <mj-column>
+        <mj-text font-size="13px" font-weight="600" color="#4F46E5" letter-spacing="0.5px" text-transform="uppercase" padding-bottom="8px">
+          {{ project_name }}
+        </mj-text>
+        <mj-text font-size="24px" font-weight="700" color="#111827" padding-bottom="10px" line-height="1.3">
+          Your post idea is ready!
+        </mj-text>
+        <mj-text color="#6B7280" padding-bottom="0">
+          We generated a new draft post for you based on your brand and products. Review it, tweak it if you like, then schedule it.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Post card mockup -->
+    <mj-section background-color="#ffffff" padding="16px 32px 32px 32px">
+      <mj-column background-color="#ffffff" border="1px solid #e5e7eb" border-radius="16px" padding="0">
+
+        <!-- Card header: logo circle + brand name + platform info -->
+        <mj-text padding="14px 16px 12px 16px" font-size="0">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
+            <tr>
+              <td style="width:46px; vertical-align:middle;">
+                {% if brand_logo_url %}
+                <img src="{{ brand_logo_url }}" width="36" height="36"
+                     style="border-radius:50%; object-fit:cover; border:1px solid #e5e7eb; display:block;" />
+                {% else %}
+                <div style="width:36px; height:36px; border-radius:50%; background:#f3f4f6; border:1px solid #e5e7eb; text-align:center; line-height:36px; font-size:15px; font-weight:700; color:#374151; font-family:Inter,-apple-system,sans-serif;">{{ project_name|first|upper }}</div>
+                {% endif %}
+              </td>
+              <td style="vertical-align:middle; padding-left:10px;">
+                <div style="font-size:14px; font-weight:700; color:#111827; line-height:1.3; font-family:Inter,-apple-system,sans-serif;">{{ project_name }}</div>
+                <div style="font-size:12px; color:#9ca3af; margin-top:2px; font-family:Inter,-apple-system,sans-serif;">All Platforms &nbsp;&middot;&nbsp; Draft preview</div>
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+        <!-- Hero image -->
+        {% if post_image_url %}
+        <mj-image src="{{ post_image_url }}" padding="0" />
+        {% endif %}
+
+        <!-- Post text -->
+        <mj-text padding="14px 16px 6px 16px" font-size="14px" color="#111827" line-height="1.5">
+          {{ post_text|truncatewords:35 }} <span style="color:#9ca3af;">more</span>
+        </mj-text>
+
+        <!-- Action icons row -->
+        <mj-text padding="8px 16px 14px 16px" font-size="0">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
+            <tr>
+              <td style="font-size:18px; color:#9ca3af; letter-spacing:6px; font-family:Arial,sans-serif;">
+                &#9825; &#128172; &#8599;
+              </td>
+              <td style="text-align:right; font-size:18px; color:#9ca3af; font-family:Arial,sans-serif;">
+                &#128278;
+              </td>
+            </tr>
+          </table>
+        </mj-text>
+
+      </mj-column>
+    </mj-section>
+
+    <!-- CTA -->
+    <mj-section background-color="#ffffff" padding="0 40px 48px 40px">
+      <mj-column>
+        <mj-button href="{{ calendar_url }}" background-color="#4F46E5" color="#ffffff">
+          View in Calendar
+        </mj-button>
+      </mj-column>
+    </mj-section>
+
+    <!-- Footer -->
+    <mj-section background-color="#f9fafb" border-radius="0 0 12px 12px" padding="24px 40px 24px 40px">
+      <mj-column>
+        <mj-text font-size="13px" color="#9CA3AF" align="center">
+          This post was auto-generated based on your brand and products. No credits were used.
+        </mj-text>
+        <mj-text font-size="13px" color="#9CA3AF" align="center" padding-top="4px">
+          &copy; Stryng. All rights reserved.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Bottom spacer -->
+    <mj-section padding="20px 0 0 0"></mj-section>
+  </mj-body>
+</mjml>
+{% endmjml %}
+

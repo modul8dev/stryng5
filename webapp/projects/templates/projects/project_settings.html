@@ -127,6 +127,30 @@
 
             <div class="border-t border-zinc-100"></div>
 
+            <!-- Daily Autopost -->
+            <div>
+                <h3 class="text-sm font-medium text-zinc-900">Daily Autopost</h3>
+                <p class="mt-1 text-sm text-zinc-500">When enabled, Stryng will automatically generate one post idea for this project every day and notify you by email. No credits are used.</p>
+                <div class="mt-4">
+                    <label class="flex cursor-pointer items-center justify-between rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50">
+                        <div class="flex items-center gap-3">
+                            <div class="flex size-9 items-center justify-center rounded-lg bg-indigo-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="size-5 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A8 8 0 0 1 4.07 9H5a1 1 0 0 1 0 2A6 6 0 0 0 11 16.93zM12 6a1 1 0 0 1 1 1v5l3 3a1 1 0 0 1-1.41 1.41l-3.3-3.3A1 1 0 0 1 11 13V7a1 1 0 0 1 1-1z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-zinc-900">Enable daily post idea</p>
+                                <p class="text-xs text-zinc-500">Generate one AI post idea every day · No credits used</p>
+                            </div>
+                        </div>
+                        {{ settings_form.enable_autopost }}
+                    </label>
+                </div>
+            </div>
+
+            <div class="border-t border-zinc-100"></div>
+
             <!-- Timezone -->
             <div>
                 <h3 class="text-sm font-medium text-zinc-900">Timezone</h3>

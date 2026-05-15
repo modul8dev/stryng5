@@ -7,14 +7,26 @@ class ProjectMiddleware:
 
     def __call__(self, request):
         if request.user.is_authenticated:
-            project_id = request.session.get('active_project_id')
             project = None
 
-            if project_id:
+            # Query parameter takes priority — allows per-tab/deep-link switching
+            param_project_id = request.GET.get('project_id')
+            if param_project_id:
                 project = Project.objects.filter(
-                    pk=project_id, owner=request.user
+                    pk=param_project_id, owner=request.user
                 ).first()
+                if project:
+                    request.session['active_project_id'] = project.pk
 
+            # Fall back to session
+            if project is None:
+                project_id = request.session.get('active_project_id')
+                if project_id:
+                    project = Project.objects.filter(
+                        pk=project_id, owner=request.user
+                    ).first()
+
+            # Fall back to first project or create one
             if project is None:
                 project = Project.objects.filter(owner=request.user).first()
                 if project is None:

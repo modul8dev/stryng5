@@ -1,0 +1,20 @@
+Hi {{ user_email }},
+
+[{{ project_name }}] Your post idea is ready!
+
+We've crafted a fresh social media post idea for you:
+
+---
+{{ post_title }}
+
+{{ post_text }}
+---
+
+Review it, tweak it if you like, and schedule it when you're ready.
+
+View in Calendar:
+{{ calendar_url }}
+
+This post was auto-generated based on your brand and products. No credits were used.
+
+The Stryng Team

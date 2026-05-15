@@ -112,10 +112,12 @@ def _notify_generation_done(post_id, processing_status, error='', shared_text=''
         logger.exception('Failed to send SSE generation-done event for post %d', post_id)
 
 
-def generate_post_task(post_id, brand_id, topic, post_type, seed_media_ids, platforms):
+def generate_post_task(post_id, brand_id, topic, post_type, seed_media_ids, platforms, skip_credits=False):
     """
     Async task: generates post text and media via AI, then saves results to the post.
     Sets processing_status to 'generating' -> 'completed' or 'error'.
+
+    When skip_credits=True, media generation always runs but no credits are deducted.
     """
     from brand.models import Brand
     from media_library.models import Media
@@ -153,10 +155,11 @@ def generate_post_task(post_id, brand_id, topic, post_type, seed_media_ids, plat
 
         # Generate media
         try:
-            if available_credits(post.user) >= IMAGE_GENERATION_COST:
+            if skip_credits or available_credits(post.user) >= IMAGE_GENERATION_COST:
                 media = generate_post_media(brand, topic, post_type, seed_media, post.user, project=post.project)
                 if media:
-                    spend_credits(post.user, IMAGE_GENERATION_COST, 'Post media generation')
+                    if not skip_credits:
+                        spend_credits(post.user, IMAGE_GENERATION_COST, 'Post media generation')
                     from .models import SocialMediaPostMedia
                     SocialMediaPostMedia.objects.create(
                         post=post,
@@ -179,3 +182,151 @@ def generate_post_task(post_id, brand_id, topic, post_type, seed_media_ids, plat
         post.processing_status = 'error'
         post.save(update_fields=['processing_status'])
         _notify_generation_done(post_id, 'error', str(e))
+
+
+def autopost_all_projects_task():
+    """
+    Periodic task (daily at 9am UTC): enqueue autopost_project_task for every
+    project that has autopost enabled.
+    """
+    from projects.models import Project
+
+    projects = Project.objects.filter(enable_autopost=True)
+    for project in projects:
+        async_task('social_media.tasks.autopost_project_task', project.pk)
+        logger.info('Enqueued autopost task for project %d (%s)', project.pk, project.name)
+
+
+def autopost_project_task(project_id):
+    """
+    Async task: generates one AI inspiration for a project and creates a draft post
+    with text and image via generate_post_task (no credits spent). Sends an email
+    notification to the project owner.
+    """
+    import random
+    from urllib.parse import urljoin
+    from django.conf import settings
+    from brand.models import Brand
+    from media_library.models import MediaGroup, Media
+    from services.ai_services import suggest_topic
+    from home.tasks import send_email_task
+    from projects.models import Project
+    from .models import SocialMediaPostSeedImage, SocialMediaPostPlatform
+
+    try:
+        project = Project.objects.select_related('owner').get(pk=project_id)
+    except Project.DoesNotExist:
+        logger.error('autopost_project_task: project %d not found', project_id)
+        return
+
+    # Load brand
+    try:
+        brand = Brand.objects.get(project=project)
+        if not brand.has_data:
+            logger.info('autopost_project_task: brand has no data for project %d, skipping', project_id)
+            return
+    except Brand.DoesNotExist:
+        logger.info('autopost_project_task: no brand for project %d, skipping', project_id)
+        return
+
+    # Get product groups
+    product_groups = list(
+        MediaGroup.objects.filter(project=project, type=MediaGroup.GroupType.PRODUCT)
+    )
+    if not product_groups:
+        logger.info('autopost_project_task: no products for project %d, skipping', project_id)
+        return
+
+    # Random selection of one product group
+    group = random.choice(product_groups)
+
+    # Get seed media (up to 2 non-generated items)
+    media_items = list(
+        group.media_items.exclude(source_type=Media.SourceType.GENERATED).all()
+    )
+    seed_media = media_items[:2]
+
+    # Generate topic (inspiration)
+    try:
+        topics = suggest_topic(brand, seed_media)
+        topic = topics[0] if topics else ''
+    except Exception:
+        logger.exception('autopost_project_task: topic generation failed for project %d', project_id)
+        return
+
+    if not topic:
+        logger.warning('autopost_project_task: empty topic for project %d, skipping', project_id)
+        return
+
+    # Create the draft post (empty text, generating state — generate_post_task will fill it)
+    post = SocialMediaPost.objects.create(
+        user=project.owner,
+        project=project,
+        title=topic[:200],
+        shared_text='',
+        topic=topic,
+        post_type='product',
+        status='draft',
+        processing_status='generating',
+    )
+
+    # Assign a default scheduled_at (next available slot at project's publish time)
+    from .views import _assign_default_scheduled_at
+    _assign_default_scheduled_at(post, project)
+    post.save(update_fields=['scheduled_at'])
+
+    # Attach seed media
+    seed_media_ids = []
+    for i, media_item in enumerate(seed_media):
+        SocialMediaPostSeedImage.objects.create(post=post, media=media_item, sort_order=i)
+        seed_media_ids.append(media_item.id)
+
+    # Create platform variants for all enabled platforms
+    platforms = project.get_enabled_platforms()
+    for platform in platforms:
+        SocialMediaPostPlatform.objects.create(
+            post=post,
+            platform=platform,
+            is_enabled=True,
+            use_shared_text=True,
+            use_shared_media=True,
+        )
+
+    # Generate text + image synchronously, without spending credits
+    generate_post_task(post.pk, brand.pk, topic, 'product', seed_media_ids, platforms, skip_credits=True)
+
+    # Reload to get generated content and image
+    post.refresh_from_db()
+    first_shared_media = post.shared_media.select_related('media').first()
+    post_image_url = None
+    if first_shared_media:
+        raw_url = first_shared_media.media.url
+        post_image_url = raw_url if raw_url.startswith('http') else urljoin(settings.SITE_URL, raw_url)
+
+    # Get brand logo URL
+    brand_logo_url = None
+    if brand.logo_id:
+        logo_media = brand.logo.media_items.first()
+        if logo_media:
+            raw_url = logo_media.url
+            brand_logo_url = raw_url if raw_url.startswith('http') else urljoin(settings.SITE_URL, raw_url)
+
+    # Send email notification to project owner
+    calendar_url = f'{settings.SITE_URL}/scheduler/?project_id={project.pk}&post={post.pk}'
+    async_task(
+        send_email_task,
+        f'Your post idea is ready! - {project.name}',
+        'social_media/email/autopost_notification.html',
+        'social_media/email/autopost_notification.txt',
+        {
+            'user_email': project.owner.email,
+            'project_name': project.name,
+            'post_title': post.title,
+            'post_text': post.shared_text,
+            'post_image_url': post_image_url,
+            'brand_logo_url': brand_logo_url,
+            'calendar_url': calendar_url,
+        },
+        project.owner.email,
+    )
+    logger.info('autopost_project_task: created post %d for project %d', post.pk, project_id)

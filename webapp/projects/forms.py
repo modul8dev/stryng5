@@ -50,12 +50,13 @@ class ProjectPublishTimeForm(forms.ModelForm):
 class ProjectSettingsForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['enable_linkedin', 'enable_x', 'enable_facebook', 'enable_instagram']
+        fields = ['enable_linkedin', 'enable_x', 'enable_facebook', 'enable_instagram', 'enable_autopost']
         widgets = {
             'enable_linkedin': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
             'enable_x': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
             'enable_facebook': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
             'enable_instagram': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
+            'enable_autopost': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-primary'}),
         }
 
 

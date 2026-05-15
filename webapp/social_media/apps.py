@@ -22,5 +22,14 @@ def _setup_schedule(sender, **kwargs):
                 'name': 'Check scheduled social media posts',
             },
         )
+        Schedule.objects.get_or_create(
+            func='social_media.tasks.autopost_all_projects_task',
+            defaults={
+                'schedule_type': Schedule.CRON,
+                'cron': '0 9 * * *',
+                'repeats': -1,
+                'name': 'Autopost for all projects',
+            },
+        )
     except Exception:
         pass
