@@ -25,10 +25,22 @@ def scheduler_view(request):
         for p in enabled_platforms
     ]
 
+    filtered_post = None
+    post_id = request.GET.get('post')
+    if post_id:
+        try:
+            filtered_post = SocialMediaPost.objects.get(
+                pk=int(post_id),
+                project=request.project,
+            )
+        except (SocialMediaPost.DoesNotExist, ValueError):
+            pass
+
     return render(request, 'scheduler/scheduler.html', {
         'platforms': platforms_for_filter,
         'status_choices': STATUS_CHOICES,
         'project_timezone': request.project.timezone,
+        'filtered_post': filtered_post,
     })
 
 
@@ -58,6 +70,10 @@ def scheduler_events(request):
     status_filter = request.GET.get('status')
     if status_filter:
         qs = qs.filter(status=status_filter)
+
+    post_filter = request.GET.get('post')
+    if post_filter:
+        qs = qs.filter(pk=post_filter)
 
     qs = qs.distinct().prefetch_related('shared_media__media', 'platforms')
 

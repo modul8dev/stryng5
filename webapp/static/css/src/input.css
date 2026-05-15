@@ -257,3 +257,26 @@ textarea {
   border-radius: 0.3rem;
   line-height: 1.25rem;
 }
+
+/* ── Mobile: compact dot/thumbnail events ─────────────────── */
+@media (max-width: 639px) {
+  .scheduler-event-header,
+  .scheduler-event-body {
+    display: none;
+  }
+  .scheduler-event-card {
+    border-radius: 0.25rem;
+    min-height: 4.0rem;
+    border: none;
+  }
+  .scheduler-event-thumb {
+    height: 4.0rem;
+    border-radius: 0.25rem;
+  }
+  /* No-thumbnail fallback: coloured left-border pill */
+  .scheduler-event-card[data-status="draft"]      { background: #f4f4f5; border-left: 3px solid #a1a1aa; }
+  .scheduler-event-card[data-status="scheduled"]  { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .scheduler-event-card[data-status="publishing"] { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .scheduler-event-card[data-status="published"]  { background: #f0fdf4; border-left: 3px solid #10b981; }
+  .scheduler-event-card[data-status="failed"]     { background: #fef2f2; border-left: 3px solid #ef4444; }
+}

@@ -3,6 +3,7 @@ function schedulerApp() {
         calendar: null,
         platformFilter: '',
         statusFilter: '',
+        postFilter: '',
 
         init() {
             const calendarEl = document.getElementById('scheduler-calendar');
@@ -10,6 +11,9 @@ function schedulerApp() {
 
             const eventsUrl = calendarEl.dataset.eventsUrl;
             const projectTimezone = calendarEl.dataset.timezone || 'local';
+            const postFilter = calendarEl.dataset.postFilter || '';
+            const postDate = calendarEl.dataset.postDate || '';
+            this.postFilter = postFilter;
             const self = this;
 
             this.calendar = new FullCalendar.Calendar(calendarEl, {
@@ -41,6 +45,7 @@ function schedulerApp() {
                     });
                     if (self.platformFilter) params.set('platform', self.platformFilter);
                     if (self.statusFilter) params.set('status', self.statusFilter);
+                    if (self.postFilter) params.set('post', self.postFilter);
 
                     fetch(eventsUrl + '?' + params.toString())
                         .then(r => r.json())
@@ -94,7 +99,7 @@ function schedulerApp() {
                         return '<span class="inline-flex items-center rounded-full ' + bc + ' px-2.5 py-0.5 text-xs font-medium">' + bl + '</span>';
                     }
 
-                    let html = '<div class="scheduler-event-card">';
+                    let html = '<div class="scheduler-event-card" data-status="' + self.escapeHtml(props.status) + '">';
 
                     // Header: status badge + time
                     html += '<div class="scheduler-event-header">';
@@ -196,6 +201,10 @@ function schedulerApp() {
             });
 
             this.calendar.render();
+
+            if (postFilter && postDate) {
+                this.calendar.gotoDate(postDate);
+            }
 
             // Listen for SSE post-changed events and surgically update the
             // matching calendar event without triggering a full refetch.
