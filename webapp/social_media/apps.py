@@ -13,7 +13,7 @@ class SocialMediaConfig(AppConfig):
 def _setup_schedule(sender, **kwargs):
     try:
         from django_q.models import Schedule
-        Schedule.objects.get_or_create(
+        Schedule.objects.update_or_create(
             func='social_media.tasks.check_scheduled_posts',
             defaults={
                 'schedule_type': Schedule.MINUTES,
@@ -22,7 +22,7 @@ def _setup_schedule(sender, **kwargs):
                 'name': 'Check scheduled social media posts',
             },
         )
-        Schedule.objects.get_or_create(
+        Schedule.objects.update_or_create(
             func='social_media.tasks.autopost_all_projects_task',
             defaults={
                 'schedule_type': Schedule.CRON,
